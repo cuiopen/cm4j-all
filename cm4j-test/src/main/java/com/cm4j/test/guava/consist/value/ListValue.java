@@ -50,6 +50,7 @@ public class ListValue<E extends CacheEntry> implements IValue {
 		if (!all_objects.contains(e)) {
 			all_objects.add(e);
 		}
+//		e.setAttachedKey(this.get)
 		e.setDbState(DBState.U);
 	}
 

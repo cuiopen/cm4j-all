@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -14,8 +13,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.value.IValue;
-import com.cm4j.test.guava.consist.value.ListValue;
-import com.cm4j.test.guava.consist.value.SingleValue;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
@@ -228,7 +225,17 @@ public class ConcurrentCache<K, V> implements Serializable {
 		V lockedGetOrLoad(K key, int hash, CacheLoader<K, V> loader) {
 			lock();
 			try {
-				V value = loader.load(key);
+				V value = null;
+				// 重新读取entry的值
+				// 防止2个线程同时load，都从db获取数据，导致加载了2份数据
+				HashEntry<K, V> e = getEntry(key, hash);
+				if (e != null) {
+					value = getLiveValue(e, now());
+				}
+				if (value == null) {
+					value = loader.load(key);
+				}
+				
 				if (value != null) {
 					put(key, hash, value, false);
 				}
@@ -341,15 +348,16 @@ public class ConcurrentCache<K, V> implements Serializable {
 					count = c; // write-volatile
 				}
 
-				// 在put的时候对value设置所属key
-				if (value instanceof SingleValue) {
-					((SingleValue) value).setAttachedKey((String) key);
-				} else if (value instanceof ListValue<?>) {
-					List<? extends CacheEntry> all = ((ListValue<?>) value).getAll_objects();
-					for (CacheEntry cacheEntry : all) {
-						cacheEntry.setAttachedKey((String) key);
-					}
-				}
+				// TODO 在put的时候对value设置所属key
+				// if (value instanceof SingleValue) {
+				// ((SingleValue) value).setAttachedKey((String) key);
+				// } else if (value instanceof ListValue<?>) {
+				// List<? extends CacheEntry> all = ((ListValue<?>)
+				// value).getAll_objects();
+				// for (CacheEntry cacheEntry : all) {
+				// cacheEntry.setAttachedKey((String) key);
+				// }
+				// }
 
 				return oldValue;
 			} finally {

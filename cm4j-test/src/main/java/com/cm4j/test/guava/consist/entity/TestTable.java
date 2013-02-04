@@ -7,6 +7,7 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import com.cm4j.test.guava.consist.DBState;
 import com.cm4j.test.guava.consist.value.SingleValue;
 
 /**
@@ -46,6 +47,12 @@ public class TestTable extends SingleValue implements IEntity {
 	@Column(name = "n_value")
 	public Long getNValue() {
 		return this.NValue;
+		// try {
+		// getLock().lock();
+		// return this.NValue;
+		// } finally {
+		// getLock().unlock();
+		// }
 	}
 
 	public void setNValue(Long NValue) {
@@ -57,8 +64,18 @@ public class TestTable extends SingleValue implements IEntity {
 		return this;
 	}
 
+	public void increaseValue() {
+		getLock().lock();
+
+		this.NValue++;
+		System.out.println(this);
+
+		getLock().unlock();
+		setDbState(DBState.U);
+	}
+
 	@Override
 	public String toString() {
-		return this.getClass().getSimpleName() + "#" + getNId() + "-" + getNValue();
+		return this.getClass().getSimpleName() + ":" + this.hashCode() + "#" + getNId() + "-" + getNValue();
 	}
 }

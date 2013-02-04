@@ -24,4 +24,14 @@ public class TestCacheByValue extends CacheDesc<ListValue<TestTable>> {
 		List<TestTable> all = hibernate.findAllByProperty("NValue", NumberUtils.toLong(params[0]));
 		return new ListValue<TestTable>(all);
 	}
+
+	public TestTable findById(int id) {
+		ListValue<TestTable> all = PersistCache.getInstance().get(this);
+		for (TestTable _testTable : all.getAll_objects()) {
+			if (_testTable.getNId() == id) {
+				return _testTable;
+			}
+		}
+		return null;
+	}
 }
