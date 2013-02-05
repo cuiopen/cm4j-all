@@ -69,7 +69,9 @@ public abstract class CacheEntry {
 		try {
 			this.dbState = state;
 			if (state != DBState.P) {
-				// TODO 缓存中不存在的时候不允许修改
+				// TODO 缓存中不存在判断的时候不允许修改
+				// 不能用isContainKey，用isContainValue()来判断缓存是否存在
+				
 				// if (StringUtils.isBlank(attachedKey) ||
 				// !PersistCache.getInstance().contains(attachedKey)) {
 				// throw new RuntimeException("缓存中不存在此对象，无法修改状态");

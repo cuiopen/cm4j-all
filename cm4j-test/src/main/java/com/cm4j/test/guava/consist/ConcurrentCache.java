@@ -513,13 +513,12 @@ public class ConcurrentCache<K, V> implements Serializable {
 				lock();
 				try {
 					// TODO 并发问题 ：简单说：对象过期被删，此时有另一线程修改，还有一个从db加载则有问题
-					// 1.isValueAllPersist()通过
-					// 2.对象修改
-					// 3.removeEntry()成功
-					// 4.另一个线程从db加载
-					// 5.对象修改状态成功，写库与4的读取非同一对象
+					// 1.缓存过期删除
+					// 2.引用对象修改缓存
+					// 3.另一线程从db加载数据
+					// 4.修改缓存写入？其实就是2个对象了。
 					// 强引用解决？
-					// or 判断对象在缓存是否存在，区分是首次还是过期了
+					// or 修改时isContainValue()判断
 					if (isValueAllPersist(e.getValue())) {
 						removeEntry((HashEntry<K, V>) e, e.getHash());
 					} else {
