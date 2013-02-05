@@ -53,20 +53,27 @@ public abstract class CacheEntry {
 		return dbState;
 	}
 
+	public void setDbState(DBState state) {
+		setDbState(state, true);
+	}
+
 	/**
 	 * 修改db状态，注意：缓存中必须有此对象才可修改db状态
 	 * 
 	 * @param state
+	 * @param isCheckInCache
+	 *            校验是否在缓存中
 	 */
-	public void setDbState(DBState state) {
+	public void setDbState(DBState state, boolean isCheckInCache) {
 		lock.lock();
 		try {
 			this.dbState = state;
 			if (state != DBState.P) {
 				// TODO 缓存中不存在的时候不允许修改
-//				if (StringUtils.isBlank(attachedKey) || !PersistCache.getInstance().contains(attachedKey)) {
-//					throw new RuntimeException("缓存中不存在此对象，无法修改状态");
-//				}
+				// if (StringUtils.isBlank(attachedKey) ||
+				// !PersistCache.getInstance().contains(attachedKey)) {
+				// throw new RuntimeException("缓存中不存在此对象，无法修改状态");
+				// }
 				PersistCache.getInstance().sendToUpdateQueue(this);
 			}
 		} finally {

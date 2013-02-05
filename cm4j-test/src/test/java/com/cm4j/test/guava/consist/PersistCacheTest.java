@@ -79,7 +79,7 @@ public class PersistCacheTest {
 		TestTable table = PersistCache.getInstance().get(new TestCacheById(1));
 
 		System.out.println("=========" + table.getNValue());
-		System.out.println((end - start));
+		System.out.println((double) (end - start) / 1000000000);
 	}
 
 	public class addThread implements Runnable {
@@ -96,6 +96,7 @@ public class PersistCacheTest {
 				for (int i = 0; i < 100; i++) {
 					TestTable table = PersistCache.getInstance().get(new TestCacheById(1));
 					table.increaseValue();
+					Thread.sleep(100);
 				}
 				barrier.await();
 			} catch (Exception e) {

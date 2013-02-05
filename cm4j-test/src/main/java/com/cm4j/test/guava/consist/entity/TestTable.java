@@ -7,6 +7,9 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cm4j.test.guava.consist.DBState;
 import com.cm4j.test.guava.consist.value.SingleValue;
 
@@ -64,11 +67,13 @@ public class TestTable extends SingleValue implements IEntity {
 		return this;
 	}
 
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+
 	public void increaseValue() {
 		getLock().lock();
 
 		this.NValue++;
-		System.out.println(this);
+		logger.debug("" + this);
 
 		getLock().unlock();
 		setDbState(DBState.U);

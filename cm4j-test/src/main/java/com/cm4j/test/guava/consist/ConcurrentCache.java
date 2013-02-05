@@ -48,7 +48,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 	transient Collection<V> values;
 
 	// TODO 默认过期纳秒
-	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(5);
+	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(3);
 
 	/* ---------------- Small Utilities -------------- */
 
@@ -235,7 +235,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 				if (value == null) {
 					value = loader.load(key);
 				}
-				
+
 				if (value != null) {
 					put(key, hash, value, false);
 				}
@@ -512,6 +512,14 @@ public class ConcurrentCache<K, V> implements Serializable {
 				// 移除的时候锁定
 				lock();
 				try {
+					// TODO 并发问题 ：简单说：对象过期被删，此时有另一线程修改，还有一个从db加载则有问题
+					// 1.isValueAllPersist()通过
+					// 2.对象修改
+					// 3.removeEntry()成功
+					// 4.另一个线程从db加载
+					// 5.对象修改状态成功，写库与4的读取非同一对象
+					// 强引用解决？
+					// or 判断对象在缓存是否存在，区分是首次还是过期了
 					if (isValueAllPersist(e.getValue())) {
 						removeEntry((HashEntry<K, V>) e, e.getHash());
 					} else {

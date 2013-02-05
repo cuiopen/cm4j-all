@@ -61,7 +61,7 @@ public class PersistCache {
 			public void run() {
 				consumeUpdateQueue();
 			}
-		}, 10, 10, TimeUnit.SECONDS);
+		}, 1, 5, TimeUnit.SECONDS);
 	}
 
 	/**
