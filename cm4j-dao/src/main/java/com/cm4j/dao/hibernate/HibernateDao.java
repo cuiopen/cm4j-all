@@ -135,7 +135,7 @@ public class HibernateDao<E, ID extends Serializable> implements InitializingBea
 	@Override
 	public void afterPropertiesSet() throws Exception {
 		try {
-			if (persistentClass == null) {
+			if (this.persistentClass == null) {
 				persistentClass = (Class<E>) ((ParameterizedType) getClass().getGenericSuperclass())
 						.getActualTypeArguments()[0];
 			}

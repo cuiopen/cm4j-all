@@ -7,8 +7,7 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>cm4j-core</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-
+	<name>cm4j-core</name>
 	<dependencies>
 		<!-- apache commons -->
 		<dependency>
@@ -36,6 +35,12 @@
 		<dependency>
 			<groupId>org.codehaus.jackson</groupId>
 			<artifactId>jackson-mapper-lgpl</artifactId>
+		</dependency>
+
+		<!-- jedis -->
+		<dependency>
+			<groupId>redis.clients</groupId>
+			<artifactId>jedis</artifactId>
 		</dependency>
 
 		<!-- test -->

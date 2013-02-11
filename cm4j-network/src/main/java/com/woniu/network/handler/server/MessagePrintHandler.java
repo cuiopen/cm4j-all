@@ -6,7 +6,6 @@ import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.util.CharsetUtil;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +22,7 @@ public class MessagePrintHandler extends SimpleChannelHandler {
 
 	@Override
 	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-		ChannelBuffer  buffer = (ChannelBuffer) e.getMessage();
+		ChannelBuffer buffer = (ChannelBuffer) e.getMessage();
 
 		logger.debug("server Buffer content:{}", buffer.array());
 
@@ -51,8 +50,10 @@ public class MessagePrintHandler extends SimpleChannelHandler {
 		logger.debug("参数：{}", buffer.readInt());
 		logger.debug("类型：{}", buffer.readByte());
 		String str = buffer.toString(CharsetUtil.UTF_8);
-		Assert.assertEquals('\u0000', str.charAt(str.length() - 1));
-		logger.debug("参数：{}",  str.substring(0, str.length() - 1));
+		if ('\u0000' != str.charAt(str.length() - 1)) {
+			logger.error("结果不一致");
+		}
+		logger.debug("参数：{}", str.substring(0, str.length() - 1));
 	}
 
 	@Override

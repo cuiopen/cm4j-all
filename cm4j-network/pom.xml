@@ -6,8 +6,8 @@
 		<groupId>com.cm4j</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<groupId>com.cm4j</groupId>
 	<artifactId>cm4j-network</artifactId>
+	<name>cm4j-network</name>
 
 	<dependencies>
 		<dependency>

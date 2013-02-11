@@ -1,5 +1,8 @@
 package com.cm4j.core.threads.sleepstrategy;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,14 +15,10 @@ public class IncrementSleepStrategy implements SleepStrategy {
 
 	public void sleep(long ms) {
 		sleepms += ms;
-		if (sleepms <= maxSleepms)
-			try {
-				Thread.sleep(sleepms);
-				logger.debug("thread [{}] sleep {} ms", Thread.currentThread().getName(), sleepms);
-			} catch (InterruptedException e) {
-				logger.error("thread [" + Thread.currentThread().getName() + "] sleep error", e);
-			}
-
+		if (sleepms <= maxSleepms) {
+			LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(sleepms));
+			logger.debug("thread [{}] sleep {} ms", Thread.currentThread().getName(), sleepms);
+		}
 	}
 
 	public void reset() {

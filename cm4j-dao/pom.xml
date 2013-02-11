@@ -6,9 +6,7 @@
 		<groupId>com.cm4j</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<groupId>com.cm4j</groupId>
 	<artifactId>cm4j-dao</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>cm4j-dao</name>
 
 	<dependencies>
@@ -24,6 +22,10 @@
 		<dependency>
 			<groupId>commons-lang</groupId>
 			<artifactId>commons-lang</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>commons-collections</groupId>
+			<artifactId>commons-collections</artifactId>
 		</dependency>
 
 		<!-- spring begin -->
@@ -70,10 +72,8 @@
 			<groupId>org.mybatis</groupId>
 			<artifactId>mybatis-spring</artifactId>
 		</dependency>
-<!-- 		<dependency>
-			<groupId>com.oracle</groupId>
-			<artifactId>ojdbc6</artifactId>
-		</dependency> -->
+		<!-- <dependency> <groupId>com.oracle</groupId> <artifactId>ojdbc6</artifactId> 
+			</dependency> -->
 
 		<!-- test -->
 		<dependency>

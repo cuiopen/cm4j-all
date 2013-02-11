@@ -3,6 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.cm4j</groupId>
 	<artifactId>cm4j-all</artifactId>
+	<name>cm4j-all</name>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
@@ -11,27 +12,32 @@
 		<!-- 日志部分 -->
 		<slf4j.version>1.6.0</slf4j.version>
 		<logback.version>0.9.24</logback.version>
-		<perf4j.version>0.9.13</perf4j.version>
+		<perf4j.version>0.9.16</perf4j.version>
 		<!-- 工具库 -->
 		<commons-lang.version>2.5</commons-lang.version>
-		<commons-codec.version>1.5</commons-codec.version>
 		<commons-collections.version>3.2.1</commons-collections.version>
 		<commons-pool.version>1.5.5</commons-pool.version>
-		<spring.version>3.0.5.RELEASE</spring.version>
-		<hibernate-validation.version>4.0.2.GA</hibernate-validation.version>
+		<commons-httpclient.version>3.1</commons-httpclient.version>
+		<commons-codec.version>1.6</commons-codec.version>
+		<spring.version>3.1.1.RELEASE</spring.version><!-- 3.0.5.RELEASE,3.1.1.RELEASE -->
 		<jackson.version>1.5.6</jackson.version>
 		<xmemcached.version>1.3.1</xmemcached.version>
 		<swt.version>3.6.2</swt.version>
 		<mail.version>1.4.1</mail.version>
 		<hamcrest.version>1.1</hamcrest.version>
-		<netty.version>3.2.4.Final</netty.version>
-		<google.guava.version>r09</google.guava.version>
+		<netty.version>3.2.7.Final</netty.version>
+		<google.guava.version>13.0</google.guava.version>
 		<quartz.version>2.0.2</quartz.version>
 		<joda-time.version>2.0</joda-time.version>
-		<http-client.version>4.1.2</http-client.version>
+		<ehcache.version>2.5.1</ehcache.version>
+		<jedis.version>2.0.0</jedis.version>
+		<aspectj.version>1.6.12</aspectj.version>
+		<deepcopy.version>1.5</deepcopy.version>
+		<kryo.version>2.16</kryo.version>
 		<!-- 数据库 -->
 		<h2database.version>1.2.135</h2database.version>
-		<hibernate.entitymanager.version>3.3.1.ga</hibernate.entitymanager.version>
+		<hibernate.version>3.3.1.ga</hibernate.version><!-- 3.3.1.ga,4.1.0.Final -->
+		<hibernate-validation.version>4.2.0.Final</hibernate-validation.version>
 		<mysql.version>5.1.12</mysql.version>
 		<oracle-jdk1.4.version>10.2.0.4.0</oracle-jdk1.4.version>
 		<oracle-jdk6.version>11.2.0.1.0</oracle-jdk6.version>
@@ -41,24 +47,34 @@
 		<jta.version>1.1</jta.version>
 		<!-- <hsqldb.version>1.8.0.10</hsqldb.version> -->
 		<!-- Test -->
-		<junit.version>4.8.1</junit.version>
-		<esaymock.version>3.0</esaymock.version>
+		<junit.version>4.10</junit.version>
+		<easymock.version>3.1</easymock.version>
 		<dbunit.version>2.4.8</dbunit.version>
 		<!-- Web -->
-		<jetty.version>6.1.24</jetty.version>
+		<jetty.version>6.1.9</jetty.version>
 		<servlet.version>2.5</servlet.version>
 		<jstl.version>1.2</jstl.version>
 		<taglibs.version>1.1.2</taglibs.version>
+		<!-- plugin -->
+		<compiler.plugin.version>2.3.1</compiler.plugin.version>
+		<surefire.plugin.version>2.5</surefire.plugin.version>
+		<resources.plugin.version>2.4.2</resources.plugin.version>
+		<jar.plugin.version>2.3</jar.plugin.version>
+		<war.plugin.version>2.1.1</war.plugin.version>
+		<release.plugin.version>2.1</release.plugin.version>
+		<eclipse.plugin.version>2.8</eclipse.plugin.version>
+		<native2ascii.plugin.version>1.0-beta-1</native2ascii.plugin.version>
+		<assembly.plugin.version>2.2-beta-5</assembly.plugin.version>
 		<!-- Plugin的属性定义 -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
 	<modules>
 		<module>cm4j-core</module>
-		<module>cm4j-email-sender</module>
 		<module>cm4j-dao</module>
 		<module>cm4j-test</module>
-		<module>cm4j-taobao</module>
+		<!--<module>cm4j-email-sender</module> -->
+		<!--<module>cm4j-taobao</module> -->
 		<module>cm4j-web</module>
 		<module>cm4j-network</module>
 	</modules>
@@ -286,19 +302,6 @@
 				<version>${jackson.version}</version>
 			</dependency>
 
-			<!-- JSR 303 -->
-			<dependency>
-				<groupId>org.hibernate</groupId>
-				<artifactId>hibernate-validator</artifactId>
-				<version>${hibernate-validation.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>org.slf4j</groupId>
-						<artifactId>slf4j-api</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-
 			<!-- mail -->
 			<dependency>
 				<groupId>javax.mail</groupId>
@@ -351,12 +354,32 @@
 				<artifactId>httpclient</artifactId>
 				<version>${http-client.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>net.sf.ehcache</groupId>
+				<artifactId>ehcache-core</artifactId>
+				<version>${ehcache.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>redis.clients</groupId>
+				<artifactId>jedis</artifactId>
+				<version>${jedis.version}</version>
+			</dependency>
 
 			<!-- 数据库 -->
 			<dependency>
+				<groupId>xml-apis</groupId>
+				<artifactId>xml-apis</artifactId>
+				<version>2.0.2</version>
+			</dependency>
+			<dependency>
+				<groupId>org.hibernate</groupId>
+				<artifactId>hibernate-core</artifactId>
+				<version>${hibernate.version}</version>
+			</dependency>
+			<dependency>
 				<groupId>org.hibernate</groupId>
 				<artifactId>hibernate-entitymanager</artifactId>
-				<version>${hibernate.entitymanager.version}</version>
+				<version>${hibernate.version}</version>
 				<exclusions>
 					<exclusion>
 						<groupId>javax.transaction</groupId>
@@ -364,6 +387,24 @@
 					</exclusion>
 				</exclusions>
 			</dependency>
+			<dependency>
+				<groupId>org.hibernate</groupId>
+				<artifactId>hibernate-proxool</artifactId>
+				<version>${hibernate.version}</version>
+			</dependency>
+			<!-- JSR 303 -->
+			<dependency>
+				<groupId>org.hibernate</groupId>
+				<artifactId>hibernate-validator</artifactId>
+				<version>${hibernate-validation.version}</version>
+				<exclusions>
+					<exclusion>
+						<groupId>org.slf4j</groupId>
+						<artifactId>slf4j-api</artifactId>
+					</exclusion>
+				</exclusions>
+			</dependency>
+
 			<dependency>
 				<groupId>c3p0</groupId>
 				<artifactId>c3p0</artifactId>
@@ -467,7 +508,7 @@
 				<!-- compiler插件, 设定JDK版本 -->
 				<plugin>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>2.3.1</version>
+					<version>${compiler.plugin.version}</version>
 					<dependencies>
 						<dependency>
 							<groupId>org.codehaus.plexus</groupId>
@@ -484,7 +525,7 @@
 				<!-- test插件 -->
 				<plugin>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>2.5</version>
+					<version>${surefire.plugin.version}</version>
 					<configuration>
 						<includes>
 							<include>**/*Test.java</include>
@@ -494,7 +535,7 @@
 				<!-- resource插件, 设定编码 -->
 				<plugin>
 					<artifactId>maven-resources-plugin</artifactId>
-					<version>2.4.2</version>
+					<version>${resources.plugin.version}</version>
 					<configuration>
 						<encoding>${project.build.sourceEncoding}</encoding>
 					</configuration>
@@ -502,7 +543,7 @@
 				<!-- jar插件 -->
 				<plugin>
 					<artifactId>maven-jar-plugin</artifactId>
-					<version>2.3</version>
+					<version>${jar.plugin.version}</version>
 					<configuration>
 						<archive>
 							<manifest>
@@ -515,7 +556,7 @@
 				<!-- war插件 -->
 				<plugin>
 					<artifactId>maven-war-plugin</artifactId>
-					<version>2.1.1</version>
+					<version>${war.plugin.version}</version>
 					<configuration>
 						<warName>${project.artifactId}</warName>
 					</configuration>
@@ -561,12 +602,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-release-plugin</artifactId>
-					<version>2.1</version>
+					<version>${release.plugin.version}</version>
 				</plugin>
 				<!-- eclipse插件 -->
 				<plugin>
 					<artifactId>maven-eclipse-plugin</artifactId>
-					<version>2.8</version>
+					<version>${eclipse.plugin.version}</version>
 					<configuration>
 						<sourceExcludes>
 							<sourceExclude>**/.svn/</sourceExclude>
@@ -574,20 +615,15 @@
 						<downloadSources>true</downloadSources>
 					</configuration>
 				</plugin>
-				<!-- Intellij IDEA插件 -->
-				<plugin>
-					<artifactId>maven-idea-plugin</artifactId>
-					<version>2.2</version>
-					<configuration>
-						<downloadSources>true</downloadSources>
-					</configuration>
-				</plugin>
+				<!-- Intellij IDEA插件 <plugin> <artifactId>maven-idea-plugin</artifactId> 
+					<version>2.2</version> <configuration> <downloadSources>true</downloadSources> 
+					</configuration> </plugin> -->
 
 				<!-- native转码插件 -->
 				<plugin>
 					<groupId>org.codehaus.mojo</groupId>
 					<artifactId>native2ascii-maven-plugin</artifactId>
-					<version>1.0-alpha-1</version>
+					<version>${native2ascii.plugin.version}</version>
 					<executions>
 						<execution>
 							<goals>
