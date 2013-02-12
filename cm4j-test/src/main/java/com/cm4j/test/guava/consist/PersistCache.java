@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.consist.loader.CacheDes;
+import com.cm4j.test.guava.consist.loader.CacheDesc;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.value.IValue;
@@ -24,6 +24,11 @@ import com.cm4j.test.guava.consist.value.IValue;
  * 
  * 写入：是由{@link CacheEntry#setDbState(DBState)}控制对象状态
  * 同时{@link PersistCache}独立维护了一份写入队列，独立于缓存操作
+ * 
+ * 待完成：
+ * 1.持久化后persist状态修改允许失败tryLock()，此时2字段修改，一个成功，lock()，另一个未完成怎么办？
+ * 2.缓存过期，此时再update，应该报错！~
+ * 3.
  * </pre>
  * 
  * @author Yang.hao
@@ -71,7 +76,7 @@ public class PersistCache {
 	 *             loading时异常
 	 */
 	@SuppressWarnings("unchecked")
-	public <V extends IValue> V get(CacheDes<V> desc) {
+	public <V extends IValue> V get(CacheDesc<V> desc) {
 		return (V) cache.get(desc.getKey());
 	}
 
@@ -83,7 +88,7 @@ public class PersistCache {
 	 * @param value
 	 * @throws Exception
 	 */
-	public <V extends IValue> void put(CacheDes<V> desc, V value) {
+	public <V extends IValue> void put(CacheDesc<V> desc, V value) {
 		cache.put(desc.getKey(), value);
 	}
 
@@ -93,8 +98,30 @@ public class PersistCache {
 	 * @param <V>
 	 * @param desc
 	 */
-	public <V extends IValue> void remove(CacheDes<V> desc) {
+	public <V extends IValue> void remove(CacheDesc<V> desc) {
 		cache.remove(desc.getKey());
+	}
+
+	/**
+	 * 是否包含缓存
+	 * 
+	 * @param <V>
+	 * @param cacheDesc
+	 * @return
+	 */
+	public <V extends IValue> boolean contains(CacheDesc<V> cacheDesc) {
+		return cache.containsKey(cacheDesc.getKey());
+	}
+
+	/**
+	 * 是否包含缓存
+	 * 
+	 * @param <V>
+	 * @param cacheDesc
+	 * @return
+	 */
+	public <V extends IValue> boolean contains(String key) {
+		return cache.containsKey(key);
 	}
 
 	public void stop() {
@@ -116,7 +143,7 @@ public class PersistCache {
 	 * 
 	 */
 	private void consumeUpdateQueue() {
-		logger.warn("缓存定时存储数据，更新队列大小：{}", updateQueue.size());
+		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
 		CacheEntry entry = null;
 		while ((entry = updateQueue.poll()) != null) {
 			int num = entry.getNumInUpdateQueue().decrementAndGet();
@@ -127,6 +154,7 @@ public class PersistCache {
 				if (entity != null) {
 					// TODO 发送db去存储
 					System.out.println(entry.getDbState() + " " + entity.toString());
+					entry.setDbPersist();
 				}
 			}
 		}

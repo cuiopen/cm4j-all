@@ -24,7 +24,8 @@ public class CacheValueLoader extends CacheLoader<String, IValue> {
 		PrefixMappping mappping = PrefixMappping.valueOf(prefix);
 		Preconditions.checkNotNull(mappping);
 
-		CacheDes<? extends IValue> desc = mappping.getCacheDesc();
+		// 这里配的是无参数对象
+		CacheDesc<? extends IValue> desc = mappping.getCacheDesc();
 		return desc.load(params);
 	}
 }

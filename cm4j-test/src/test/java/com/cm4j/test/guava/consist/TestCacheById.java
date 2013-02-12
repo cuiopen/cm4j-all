@@ -2,10 +2,10 @@ package com.cm4j.test.guava.consist;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.loader.CacheDes;
+import com.cm4j.test.guava.consist.loader.CacheDesc;
 import com.google.common.base.Preconditions;
 
-public class TestCacheById extends CacheDes<TestTable> {
+public class TestCacheById extends CacheDesc<TestTable> {
 
 	public TestCacheById(Object... params) {
 		super(params);

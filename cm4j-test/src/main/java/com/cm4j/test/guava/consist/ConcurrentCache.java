@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -13,6 +14,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.value.IValue;
+import com.cm4j.test.guava.consist.value.ListValue;
+import com.cm4j.test.guava.consist.value.SingleValue;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
@@ -198,7 +201,9 @@ public class ConcurrentCache<K, V> implements Serializable {
 				return null;
 			} else if (map.isExpired(e, now)) {
 				tryExpireEntries(now);
-				return null;
+				if (isValueAllPersist(e.getValue())) {
+					return null;
+				}
 			}
 			return e;
 		}
@@ -211,14 +216,12 @@ public class ConcurrentCache<K, V> implements Serializable {
 				return null;
 			}
 			if (map.isExpired(entry, now)) {
-				tryExpireEntries(now);
 				// 如果状态不是P，则会延迟生命周期
-				// 因此这里需要再次判断
-				if (map.isExpired(entry, now)) {
+				tryExpireEntries(now);
+				if (isValueAllPersist(entry.getValue())) {
 					return null;
 				}
 			}
-
 			return entry.value;
 		}
 
@@ -312,8 +315,9 @@ public class ConcurrentCache<K, V> implements Serializable {
 				preWriteCleanup(now());
 
 				int c = count;
-				if (c++ > threshold) // ensure capacity
+				if (c++ > threshold) { // ensure capacity
 					rehash();
+				}
 				AtomicReferenceArray<HashEntry<K, V>> tab = table;
 				int index = hash & (tab.length() - 1);
 				HashEntry<K, V> first = tab.get(index);
@@ -336,6 +340,17 @@ public class ConcurrentCache<K, V> implements Serializable {
 					tab.set(index, e);
 					count = c; // write-volatile
 				}
+
+				// 在put的时候对value设置所属key
+				if (value instanceof SingleValue) {
+					((SingleValue) value).setAttachedKey((String) key);
+				} else if (value instanceof ListValue<?>) {
+					List<? extends CacheEntry> all = ((ListValue<?>) value).getAll_objects();
+					for (CacheEntry cacheEntry : all) {
+						cacheEntry.setAttachedKey((String) key);
+					}
+				}
+
 				return oldValue;
 			} finally {
 				unlock();

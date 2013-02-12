@@ -11,11 +11,11 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-19 下午01:13:54
  * 
  */
-public abstract class CacheDes<V extends IValue> {
+public abstract class CacheDesc<V extends IValue> {
 
 	private Object[] params;
 
-	protected CacheDes(Object... params) {
+	protected CacheDesc(Object... params) {
 		this.params = params;
 	}
 

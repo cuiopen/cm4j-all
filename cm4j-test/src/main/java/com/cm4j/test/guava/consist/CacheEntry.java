@@ -4,6 +4,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.cm4j.test.guava.consist.entity.IEntity;
 
 /**
@@ -24,12 +26,60 @@ public abstract class CacheEntry {
 	 * 在更新队列中的数量
 	 */
 	private final AtomicInteger numInUpdateQueue = new AtomicInteger(0);
-	
+
 	private final Lock lock = new ReentrantLock();
 
+	/**
+	 * entry所属缓存key
+	 */
+	private String attachedKey;
+
+	/**
+	 * expire设置DB状态为P，能获取到锁则修改
+	 */
+	void setDbPersist() {
+		// 能获取到锁则修改
+		if (lock.tryLock()) {
+			try {
+				this.dbState = DBState.P;
+			} finally {
+				lock.unlock();
+			}
+		}
+	}
+
+	AtomicInteger getNumInUpdateQueue() {
+		return numInUpdateQueue;
+	}
+
+	protected String getAttachedKey() {
+		return attachedKey;
+	}
+
+	protected void setAttachedKey(String attachedKey) {
+		this.attachedKey = attachedKey;
+	}
+
+	public Lock getLock() {
+		return lock;
+	}
+
+	public DBState getDbState() {
+		return dbState;
+	}
+
+	/**
+	 * 修改db状态，注意：缓存中必须有此对象才可修改db状态
+	 * 
+	 * @param state
+	 */
 	public void setDbState(DBState state) {
 		lock.lock();
 		try {
+			// 缓存中不存在的时候不允许修改
+			if (StringUtils.isBlank(attachedKey) || !PersistCache.getInstance().contains(attachedKey)) {
+				throw new RuntimeException("缓存中不存在此对象，无法修改状态");
+			}
 			this.dbState = state;
 			if (state != DBState.P) {
 				PersistCache.getInstance().sendToUpdateQueue(this);
@@ -39,22 +89,10 @@ public abstract class CacheEntry {
 		}
 	}
 
-	public DBState getDbState() {
-		return dbState;
-	}
-
-	public AtomicInteger getNumInUpdateQueue() {
-		return numInUpdateQueue;
-	}
-	
-	public Lock getLock() {
-		return lock;
-	}
-
 	/**
 	 * 根据当前缓存对象解析hibernate entity进行数据保存
 	 * 
 	 * @return
 	 */
-	public abstract IEntity parseEntity();
+	protected abstract IEntity parseEntity();
 }

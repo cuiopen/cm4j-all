@@ -16,9 +16,9 @@ public enum PrefixMappping {
 	$1(new TestCacheById()),
 	$2(new TestCacheByValue());
 
-	private CacheDes<? extends IValue> cacheDesc;
+	private CacheDesc<? extends IValue> cacheDesc;
 
-	PrefixMappping(CacheDes<? extends IValue> cacheDesc) {
+	PrefixMappping(CacheDesc<? extends IValue> cacheDesc) {
 		this.cacheDesc = cacheDesc;
 	}
 
@@ -28,7 +28,7 @@ public enum PrefixMappping {
 	 * @param cacheDesc
 	 * @return
 	 */
-	public static PrefixMappping getMapping(CacheDes<? extends IValue> cacheDesc) {
+	public static PrefixMappping getMapping(CacheDesc<? extends IValue> cacheDesc) {
 		PrefixMappping[] values = values();
 		for (PrefixMappping value : values) {
 			if (value.getCacheDesc().getClass().isAssignableFrom(cacheDesc.getClass())) {
@@ -38,7 +38,7 @@ public enum PrefixMappping {
 		return null;
 	}
 
-	public CacheDes<? extends IValue> getCacheDesc() {
+	public CacheDesc<? extends IValue> getCacheDesc() {
 		return cacheDesc;
 	}
 }
