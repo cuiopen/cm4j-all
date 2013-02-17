@@ -11,11 +11,11 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-19 下午01:13:54
  * 
  */
-public abstract class CacheDesc<V extends IValue> {
+public abstract class CacheDescriptor<V extends IValue> {
 
 	private Object[] params;
 
-	protected CacheDesc(Object... params) {
+	protected CacheDescriptor(Object... params) {
 		this.params = params;
 	}
 
@@ -30,6 +30,8 @@ public abstract class CacheDesc<V extends IValue> {
 
 	public String getKey() {
 		Preconditions.checkArgument(params.length > 0, "cache entry param's size is 0");
-		return new JOINER(PrefixMappping.getMapping(this).name(), params).key();
+		PrefixMappping mapping = PrefixMappping.getMapping(this);
+		Preconditions.checkNotNull(mapping, "cache's prefix is not mapping");
+		return new JOINER(mapping.name(), params).key();
 	}
 }

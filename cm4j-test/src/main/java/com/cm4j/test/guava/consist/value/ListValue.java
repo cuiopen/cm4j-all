@@ -34,10 +34,20 @@ public class ListValue<E extends CacheEntry> implements IValue {
 		}
 	}
 
-	public List<E> getAll_objects() {
+	/**
+	 * 获取
+	 * 
+	 * @return
+	 */
+	public List<E> getAllObjects() {
 		return all_objects;
 	}
 
+	/**
+	 * 删除
+	 * 
+	 * @param e
+	 */
 	public void delete(E e) {
 		if (!all_objects.contains(e)) {
 			throw new RuntimeException("cache object is not exist,can not delete it");
@@ -46,11 +56,15 @@ public class ListValue<E extends CacheEntry> implements IValue {
 		e.setDbState(DBState.D);
 	}
 
+	/**
+	 * 新增或修改
+	 * 
+	 * @param e
+	 */
 	public void saveOrUpdate(E e) {
 		if (!all_objects.contains(e)) {
 			all_objects.add(e);
 		}
-//		e.setAttachedKey(this.get)
 		e.setDbState(DBState.U);
 	}
 

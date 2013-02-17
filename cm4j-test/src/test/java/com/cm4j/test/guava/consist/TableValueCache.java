@@ -6,13 +6,13 @@ import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.loader.CacheDesc;
+import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.value.ListValue;
 import com.google.common.base.Preconditions;
 
-public class TestCacheByValue extends CacheDesc<ListValue<TestTable>> {
+public class TableValueCache extends CacheDescriptor<ListValue<TestTable>> {
 
-	public TestCacheByValue(Object... params) {
+	public TableValueCache(Object... params) {
 		super(params);
 	}
 
@@ -27,7 +27,7 @@ public class TestCacheByValue extends CacheDesc<ListValue<TestTable>> {
 
 	public TestTable findById(int id) {
 		ListValue<TestTable> all = PersistCache.getInstance().get(this);
-		for (TestTable _testTable : all.getAll_objects()) {
+		for (TestTable _testTable : all.getAllObjects()) {
 			if (_testTable.getNId() == id) {
 				return _testTable;
 			}

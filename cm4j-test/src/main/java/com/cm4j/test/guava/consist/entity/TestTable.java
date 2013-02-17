@@ -50,12 +50,6 @@ public class TestTable extends SingleValue implements IEntity {
 	@Column(name = "n_value")
 	public Long getNValue() {
 		return this.NValue;
-		// try {
-		// getLock().lock();
-		// return this.NValue;
-		// } finally {
-		// getLock().unlock();
-		// }
 	}
 
 	public void setNValue(Long NValue) {
@@ -75,8 +69,8 @@ public class TestTable extends SingleValue implements IEntity {
 		this.NValue++;
 		logger.debug("" + this);
 
-		getLock().unlock();
 		setDbState(DBState.U);
+		getLock().unlock();
 	}
 
 	@Override

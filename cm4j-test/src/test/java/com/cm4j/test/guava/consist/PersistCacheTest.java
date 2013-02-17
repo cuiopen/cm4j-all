@@ -10,7 +10,6 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.loader.CacheDesc;
 import com.cm4j.test.guava.consist.value.ListValue;
 
 /**
@@ -26,15 +25,15 @@ import com.cm4j.test.guava.consist.value.ListValue;
 public class PersistCacheTest {
 
 	@Test
-	public void testGet() {
-		TestTable table = PersistCache.getInstance().get(new TestCacheById(1));
-		TestTable table2 = PersistCache.getInstance().get(new TestCacheById(1));
+	public void getTest() {
+		TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
+		TestTable table2 = PersistCache.getInstance().get(new TableIdCache(1));
 
 		Assert.assertTrue(table == table2);
 
-		TestCacheByValue desc = new TestCacheByValue(1);
+		TableValueCache desc = new TableValueCache(1);
 		ListValue<TestTable> list = PersistCache.getInstance().get(desc);
-		Assert.assertTrue(list.getAll_objects().size() > 0);
+		Assert.assertTrue(list.getAllObjects().size() > 0);
 
 		// 基于desc搜索结果上的二次筛选
 		TestTable table3 = desc.findById(3);
@@ -45,9 +44,15 @@ public class PersistCacheTest {
 	}
 
 	@Test
+	public void multiTableGetTest() {
+		TableAndName tableAndName = PersistCache.getInstance().get(new TableAndNameCache(1));
+		Assert.assertNotNull(tableAndName.getName());
+	}
+
+	@Test
 	public void addTest() {
 		TestTable test = new TestTable(3, (long) 4);
-		CacheDesc<TestTable> desc = new TestCacheById(3);
+		TableIdCache desc = new TableIdCache(3);
 		PersistCache.getInstance().put(desc, test);
 		test.setDbState(DBState.U);
 		TestTable testTable = PersistCache.getInstance().get(desc);
@@ -56,7 +61,7 @@ public class PersistCacheTest {
 
 	@Test
 	public void collTest() {
-		TestCacheByValue desc = new TestCacheByValue(1);
+		TableValueCache desc = new TableValueCache(1);
 		ListValue<TestTable> list = PersistCache.getInstance().get(desc);
 		TestTable table = new TestTable(4, (long) 6);
 		list.saveOrUpdate(table);
@@ -76,7 +81,7 @@ public class PersistCacheTest {
 		barrier.await();
 		long end = System.nanoTime();
 
-		TestTable table = PersistCache.getInstance().get(new TestCacheById(1));
+		TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
 
 		System.out.println("=========" + table.getNValue());
 		System.out.println((double) (end - start) / 1000000000);
@@ -93,10 +98,11 @@ public class PersistCacheTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 100; i++) {
-					TestTable table = PersistCache.getInstance().get(new TestCacheById(1));
+				for (int i = 0; i < 1000; i++) {
+					TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
 					table.increaseValue();
-					Thread.sleep(100);
+					// 为增加并发异常，暂停100ms
+					Thread.sleep(10);
 				}
 				barrier.await();
 			} catch (Exception e) {

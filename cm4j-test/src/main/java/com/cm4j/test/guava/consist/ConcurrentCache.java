@@ -51,10 +51,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(3);
 
 	/* ---------------- Small Utilities -------------- */
-
-	private static int hash(int h) {
-		// Spread bits to regularize both segment and index locations,
-		// using variant of single-word Wang/Jenkins hash.
+	private static int rehash(int h) {
 		h += (h << 15) ^ 0xffffcd7d;
 		h ^= (h >>> 10);
 		h += (h << 3);
@@ -506,26 +503,21 @@ public class ConcurrentCache<K, V> implements Serializable {
 			}
 		}
 
+		// 调用方都有锁
 		void expireEntries(long now) {
 			ReferenceEntry<K, V> e;
 			while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
-				// 移除的时候锁定
-				lock();
-				try {
-					// TODO 并发问题 ：简单说：对象过期被删，此时有另一线程修改，还有一个从db加载则有问题
-					// 1.缓存过期删除
-					// 2.引用对象修改缓存
-					// 3.另一线程从db加载数据
-					// 4.修改缓存写入？其实就是2个对象了。
-					// 强引用解决？
-					// or 修改时isContainValue()判断
-					if (isValueAllPersist(e.getValue())) {
-						removeEntry((HashEntry<K, V>) e, e.getHash());
-					} else {
-						recordAccess(e);
-					}
-				} finally {
-					unlock();
+				// TODO 并发问题 ：简单说：对象过期被删，此时有另一线程仍然持有对象并修改
+				// 1.缓存过期删除
+				// 2.引用对象修改缓存
+				// 3.因对象被删，另一线程从db加载数据
+				// 4.修改缓存写入？其实就是2个对象了。
+				// 强引用解决？
+				// or 修改时isContainValue()判断
+				if (isValueAllPersist(e.getValue())) {
+					removeEntry((HashEntry<K, V>) e, e.getHash());
+				} else {
+					recordAccess(e);
 				}
 			}
 		}
@@ -706,7 +698,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 	}
 
 	public V get(K key) {
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, true);
 	}
 
@@ -717,19 +709,19 @@ public class ConcurrentCache<K, V> implements Serializable {
 	 * @return
 	 */
 	public V getIfPresent(K key) {
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, false);
 	}
 
 	public boolean containsKey(K key) {
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).containsKey(key, hash);
 	}
 
 	public V put(K key, V value) {
 		if (value == null)
 			throw new NullPointerException();
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).put(key, hash, value, false);
 	}
 
@@ -743,7 +735,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 	public V putIfAbsent(K key, V value) {
 		if (value == null)
 			throw new NullPointerException();
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).put(key, hash, value, true);
 	}
 
@@ -753,12 +745,12 @@ public class ConcurrentCache<K, V> implements Serializable {
 	}
 
 	public V remove(K key) {
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).remove(key, hash, null);
 	}
 
 	public boolean remove(K key, V value) {
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		if (value == null)
 			return false;
 		return segmentFor(hash).remove(key, hash, value) != null;
@@ -767,14 +759,14 @@ public class ConcurrentCache<K, V> implements Serializable {
 	public boolean replace(K key, V oldValue, V newValue) {
 		if (oldValue == null || newValue == null)
 			throw new NullPointerException();
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).replace(key, hash, oldValue, newValue);
 	}
 
 	public V replace(K key, V value) {
 		if (value == null)
 			throw new NullPointerException();
-		int hash = hash(key.hashCode());
+		int hash = rehash(key.hashCode());
 		return segmentFor(hash).replace(key, hash, value);
 	}
 

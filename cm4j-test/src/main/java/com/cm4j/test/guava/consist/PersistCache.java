@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.consist.loader.CacheDesc;
+import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.value.IValue;
@@ -73,7 +73,7 @@ public class PersistCache {
 	 *             loading时异常
 	 */
 	@SuppressWarnings("unchecked")
-	public <V extends IValue> V get(CacheDesc<V> desc) {
+	public <V extends IValue> V get(CacheDescriptor<V> desc) {
 		return (V) cache.get(desc.getKey());
 	}
 
@@ -85,7 +85,7 @@ public class PersistCache {
 	 * @param value
 	 * @throws Exception
 	 */
-	public <V extends IValue> void put(CacheDesc<V> desc, V value) {
+	public <V extends IValue> void put(CacheDescriptor<V> desc, V value) {
 		cache.put(desc.getKey(), value);
 	}
 
@@ -95,7 +95,7 @@ public class PersistCache {
 	 * @param <V>
 	 * @param desc
 	 */
-	public <V extends IValue> void remove(CacheDesc<V> desc) {
+	public <V extends IValue> void remove(CacheDescriptor<V> desc) {
 		cache.remove(desc.getKey());
 	}
 
@@ -106,7 +106,7 @@ public class PersistCache {
 	 * @param cacheDesc
 	 * @return
 	 */
-	public <V extends IValue> boolean contains(CacheDesc<V> cacheDesc) {
+	public <V extends IValue> boolean contains(CacheDescriptor<V> cacheDesc) {
 		return cache.containsKey(cacheDesc.getKey());
 	}
 

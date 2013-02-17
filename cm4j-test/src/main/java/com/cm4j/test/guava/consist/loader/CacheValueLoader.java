@@ -25,7 +25,7 @@ public class CacheValueLoader extends CacheLoader<String, IValue> {
 		Preconditions.checkNotNull(mappping);
 
 		// 这里配的是无参数对象
-		CacheDesc<? extends IValue> desc = mappping.getCacheDesc();
+		CacheDescriptor<? extends IValue> desc = mappping.getCacheDesc();
 		return desc.load(params);
 	}
 }
