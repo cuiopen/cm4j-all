@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -13,6 +14,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.value.IValue;
+import com.cm4j.test.guava.consist.value.ListValue;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
@@ -21,12 +23,10 @@ import com.google.common.collect.AbstractSequentialIterator;
  * @author Yang.hao
  * @since 2013-1-30 上午11:25:47
  * 
- * @param <K>
- * @param <V>
+ * @param <String>
+ * @param <IValue>
  */
-public class ConcurrentCache<K, V> implements Serializable {
-	private static final long serialVersionUID = 7249069246763182397L;
-
+public class ConcurrentCache {
 	/* ---------------- Constants -------------- */
 
 	static final int DEFAULT_INITIAL_CAPACITY = 16;
@@ -38,16 +38,16 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 	/* ---------------- Fields -------------- */
 
-	final CacheLoader<K, V> loader;
+	final CacheLoader<String, IValue> loader;
 	final int segmentMask;
 	final int segmentShift;
-	final Segment<K, V>[] segments;
+	final Segment[] segments;
 
-	transient Set<K> keySet;
-	transient Set<Map.Entry<K, V>> entrySet;
-	transient Collection<V> values;
+	transient Set<String> keySet;
+	transient Set<Map.Entry<String, IValue>> entrySet;
+	transient Collection<IValue> values;
 
-	// TODO 默认过期纳秒
+	// TODO 默认过期纳秒，完成时需更改为较长时间过期
 	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(3);
 
 	/* ---------------- Small Utilities -------------- */
@@ -60,25 +60,25 @@ public class ConcurrentCache<K, V> implements Serializable {
 		return h ^ (h >>> 16);
 	}
 
-	final Segment<K, V> segmentFor(int hash) {
+	final Segment segmentFor(int hash) {
 		return segments[(hash >>> segmentShift) & segmentMask];
 	}
 
 	/* ---------------- Inner Classes -------------- */
 
-	static class HashEntry<K, V> implements ReferenceEntry<K, V> {
-		final K key;
+	static class HashEntry implements ReferenceEntry {
+		final String key;
 		final int hash;
-		volatile V value;
-		final HashEntry<K, V> next;
+		volatile IValue value;
+		final HashEntry next;
 
 		@Override
-		public K getKey() {
+		public String getKey() {
 			return key;
 		}
 
 		@Override
-		public V getValue() {
+		public IValue getValue() {
 			return value;
 		}
 
@@ -88,19 +88,19 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		public ReferenceEntry<K, V> getNext() {
+		public ReferenceEntry getNext() {
 			return next;
 		}
 
-		HashEntry(K key, int hash, HashEntry<K, V> next, V value) {
+		HashEntry(String key, int hash, HashEntry next, IValue value) {
 			this.key = key;
 			this.hash = hash;
 			this.next = next;
 			this.value = value;
 		}
 
-		static final <K, V> AtomicReferenceArray<HashEntry<K, V>> newArray(int i) {
-			return new AtomicReferenceArray<HashEntry<K, V>>(i);
+		static final AtomicReferenceArray<HashEntry> newArray(int i) {
+			return new AtomicReferenceArray<HashEntry>(i);
 		}
 
 		volatile long accessTime = Long.MAX_VALUE;
@@ -115,73 +115,72 @@ public class ConcurrentCache<K, V> implements Serializable {
 			this.accessTime = time;
 		}
 
-		ReferenceEntry<K, V> nextAccess = nullEntry();
+		ReferenceEntry nextAccess = nullEntry();
 
 		@Override
-		public ReferenceEntry<K, V> getNextInAccessQueue() {
+		public ReferenceEntry getNextInAccessQueue() {
 			return nextAccess;
 		}
 
 		@Override
-		public void setNextInAccessQueue(ReferenceEntry<K, V> next) {
+		public void setNextInAccessQueue(ReferenceEntry next) {
 			this.nextAccess = next;
 		}
 
-		ReferenceEntry<K, V> previousAccess = nullEntry();
+		ReferenceEntry previousAccess = nullEntry();
 
 		@Override
-		public ReferenceEntry<K, V> getPreviousInAccessQueue() {
+		public ReferenceEntry getPreviousInAccessQueue() {
 			return previousAccess;
 		}
 
 		@Override
-		public void setPreviousInAccessQueue(ReferenceEntry<K, V> previous) {
+		public void setPreviousInAccessQueue(ReferenceEntry previous) {
 			this.previousAccess = previous;
 		}
 	}
 
-	static final class Segment<K, V> extends ReentrantLock implements Serializable {
+	static final class Segment extends ReentrantLock implements Serializable {
 
 		private static final long serialVersionUID = 2249069246763182397L;
 
 		// 作为位操作的mask，必须是(2^n)-1
 		static final int DRAIN_THRESHOLD = 0x3F;
 
-		final ConcurrentCache<K, V> map;
+		final ConcurrentCache map;
 
 		transient volatile int count;
 		transient int modCount;
 		transient int threshold;
-		transient volatile AtomicReferenceArray<HashEntry<K, V>> table;
+		transient volatile AtomicReferenceArray<HashEntry> table;
 		final float loadFactor;
 
-		final AccessQueue<K, V> accessQueue;
+		final AccessQueue accessQueue;
 		final AtomicInteger readCount = new AtomicInteger();
 
-		Segment(ConcurrentCache<K, V> map, int initialCapacity, float lf) {
+		Segment(ConcurrentCache map, int initialCapacity, float lf) {
 			this.map = map;
 			loadFactor = lf;
-			setTable(HashEntry.<K, V> newArray(initialCapacity));
-			accessQueue = new AccessQueue<K, V>();
+			setTable(HashEntry.newArray(initialCapacity));
+			accessQueue = new AccessQueue();
 		}
 
-		@SuppressWarnings("unchecked")
-		static final <K, V> Segment<K, V>[] newArray(int i) {
+		static final Segment[] newArray(int i) {
 			return new Segment[i];
 		}
 
-		void setTable(AtomicReferenceArray<HashEntry<K, V>> newTable) {
+		void setTable(AtomicReferenceArray<HashEntry> newTable) {
 			threshold = (int) (newTable.length() * loadFactor);
 			table = newTable;
 		}
 
-		HashEntry<K, V> getFirst(int hash) {
-			AtomicReferenceArray<HashEntry<K, V>> tab = table;
+		HashEntry getFirst(int hash) {
+			AtomicReferenceArray<HashEntry> tab = table;
 			return tab.get(hash & (tab.length() - 1));
 		}
 
-		HashEntry<K, V> getEntry(K key, int hash) {
-			for (HashEntry<K, V> e = getFirst(hash); e != null; e = e.next) {
+		HashEntry getEntry(String key, int hash) {
+			for (HashEntry e = getFirst(hash); e != null; e = e.next) {
 				if (e.hash == hash && key.equals(e.key)) {
 					return e;
 				}
@@ -189,65 +188,36 @@ public class ConcurrentCache<K, V> implements Serializable {
 			return null;
 		}
 
-		HashEntry<K, V> getLiveEntry(K key, int hash, long now) {
-			HashEntry<K, V> e = getEntry(key, hash);
+		IValue getLiveValue(String key, int hash, long now) {
+			HashEntry e = getLiveEntry(key, hash, now);
+			if (e != null) {
+				return e.getValue();
+			}
+			return null;
+		}
+
+		HashEntry getLiveEntry(String key, int hash, long now) {
+			HashEntry e = getEntry(key, hash);
 			if (e == null) {
 				return null;
 			} else if (map.isExpired(e, now)) {
+				// 如果状态不是P，则会延迟生命周期
 				tryExpireEntries(now);
-				if (isValueAllPersist(e.getValue())) {
+				// 非精准查询，如果延长生命周期，这里依然返回null，get()调用时需在有锁情况下做二次检测
+				if (e.getValue().isAllPersist()) {
 					return null;
 				}
 			}
 			return e;
 		}
 
-		V getLiveValue(HashEntry<K, V> entry, long now) {
-			if (entry.key == null) {
-				return null;
-			}
-			if (entry.value == null) {
-				return null;
-			}
-			if (map.isExpired(entry, now)) {
-				// 如果状态不是P，则会延迟生命周期
-				tryExpireEntries(now);
-				if (isValueAllPersist(entry.getValue())) {
-					return null;
-				}
-			}
-			return entry.value;
-		}
-
-		V lockedGetOrLoad(K key, int hash, CacheLoader<K, V> loader) {
-			lock();
-			try {
-				V value = null;
-				// 重新读取entry的值
-				// 防止2个线程同时load，都从db获取数据，导致加载了2份数据
-				HashEntry<K, V> e = getEntry(key, hash);
-				if (e != null) {
-					value = getLiveValue(e, now());
-				}
-				if (value == null) {
-					value = loader.load(key);
-				}
-
-				if (value != null) {
-					put(key, hash, value, false);
-				}
-				return value;
-			} finally {
-				unlock();
-			}
-		}
-
-		V get(K key, int hash, CacheLoader<K, V> loader, boolean isLoad) {
+		IValue get(String key, int hash, CacheLoader<String, IValue> loader, boolean isLoad) {
 			try {
 				if (count != 0) { // read-volatile
-					HashEntry<K, V> e = getEntry(key, hash);
+					HashEntry e = getEntry(key, hash);
 					if (e != null) {
-						V value = getLiveValue(e, now());
+						// 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
+						IValue value = getLiveValue(key, hash, now());
 						if (value != null) {
 							recordAccess(e);
 							return value;
@@ -264,56 +234,41 @@ public class ConcurrentCache<K, V> implements Serializable {
 			return null;
 		}
 
-		boolean containsKey(K key, int hash) {
+		IValue lockedGetOrLoad(String key, int hash, CacheLoader<String, IValue> loader) {
+			lock();
+			try {
+				// 有锁情况下重读entry的值
+				// recheck,防止2个线程同时load，都从db获取数据，导致加载了2份数据
+				IValue value = getLiveValue(key, hash, now());
+				if (value == null) {
+					value = loader.load(key);
+				}
+
+				if (value != null) {
+					put(key, hash, value, false);
+				}
+				return value;
+			} finally {
+				unlock();
+			}
+		}
+
+		boolean containsKey(String key, int hash) {
 			if (count != 0) { // read-volatile
 				long now = now();
-				HashEntry<K, V> e = getLiveEntry(key, hash, now);
-				return e != null;
+
+				lock();
+				try {
+					HashEntry e = getLiveEntry(key, hash, now);
+					return e != null;
+				} finally {
+					unlock();
+				}
 			}
 			return false;
 		}
 
-		boolean replace(K key, int hash, V oldValue, V newValue) {
-			lock();
-			preWriteCleanup(now());
-			try {
-				HashEntry<K, V> e = getFirst(hash);
-				while (e != null && (e.hash != hash || !key.equals(e.key)))
-					e = e.next;
-
-				boolean replaced = false;
-				if (e != null && oldValue.equals(e.value)) {
-					replaced = true;
-					e.value = newValue;
-				}
-				return replaced;
-			} finally {
-				unlock();
-				postWriteCleanup();
-			}
-		}
-
-		V replace(K key, int hash, V newValue) {
-			lock();
-			preWriteCleanup(now());
-			try {
-				HashEntry<K, V> e = getFirst(hash);
-				while (e != null && (e.hash != hash || !key.equals(e.key)))
-					e = e.next;
-
-				V oldValue = null;
-				if (e != null) {
-					oldValue = e.value;
-					e.value = newValue;
-				}
-				return oldValue;
-			} finally {
-				unlock();
-				postWriteCleanup();
-			}
-		}
-
-		V put(K key, int hash, V value, boolean onlyIfAbsent) {
+		IValue put(String key, int hash, IValue value, boolean onlyIfAbsent) {
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -322,14 +277,14 @@ public class ConcurrentCache<K, V> implements Serializable {
 				if (c++ > threshold) { // ensure capacity
 					rehash();
 				}
-				AtomicReferenceArray<HashEntry<K, V>> tab = table;
+				AtomicReferenceArray<HashEntry> tab = table;
 				int index = hash & (tab.length() - 1);
-				HashEntry<K, V> first = tab.get(index);
-				HashEntry<K, V> e = first;
+				HashEntry first = tab.get(index);
+				HashEntry e = first;
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				V oldValue;
+				IValue oldValue;
 				if (e != null) {
 					oldValue = e.value;
 					if (!onlyIfAbsent) {
@@ -339,23 +294,23 @@ public class ConcurrentCache<K, V> implements Serializable {
 				} else {
 					oldValue = null;
 					++modCount;
-					e = new HashEntry<K, V>(key, hash, first, value);
+					e = new HashEntry(key, hash, first, value);
 					recordAccess(e);
 					tab.set(index, e);
 					count = c; // write-volatile
 				}
 
-				// TODO 在put的时候对value设置所属key
-				// if (value instanceof SingleValue) {
-				// ((SingleValue) value).setAttachedKey((String) key);
-				// } else if (value instanceof ListValue<?>) {
-				// List<? extends CacheEntry> all = ((ListValue<?>)
-				// value).getAll_objects();
-				// for (CacheEntry cacheEntry : all) {
-				// cacheEntry.setAttachedKey((String) key);
-				// }
-				// }
+				// 在put的时候对value设置所属key
+				value.setAttachedKey(key);
+				if (value instanceof ListValue<?>) {
+					((ListValue<?>) value).setAttachedKey(key);
+					List<? extends CacheEntry> all = ((ListValue<?>) value).getAllObjects();
+					for (CacheEntry cacheEntry : all) {
+						cacheEntry.setAttachedKey(key);
+					}
+				}
 
+				// 返回旧值
 				return oldValue;
 			} finally {
 				unlock();
@@ -364,21 +319,21 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		void rehash() {
-			AtomicReferenceArray<HashEntry<K, V>> oldTable = table;
+			AtomicReferenceArray<HashEntry> oldTable = table;
 			int oldCapacity = oldTable.length();
 			if (oldCapacity >= MAXIMUM_CAPACITY)
 				return;
 
-			AtomicReferenceArray<HashEntry<K, V>> newTable = HashEntry.newArray(oldCapacity << 1);
+			AtomicReferenceArray<HashEntry> newTable = HashEntry.newArray(oldCapacity << 1);
 			threshold = (int) (newTable.length() * loadFactor);
 			int sizeMask = newTable.length() - 1;
 			for (int i = 0; i < oldCapacity; i++) {
 				// We need to guarantee that any existing reads of old Map can
 				// proceed. So we cannot yet null out each bin.
-				HashEntry<K, V> e = oldTable.get(i);
+				HashEntry e = oldTable.get(i);
 
 				if (e != null) {
-					HashEntry<K, V> next = e.next;
+					HashEntry next = e.next;
 					int idx = e.hash & sizeMask;
 
 					// Single node on list
@@ -387,9 +342,9 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 					else {
 						// Reuse trailing consecutive sequence at same slot
-						HashEntry<K, V> lastRun = e;
+						HashEntry lastRun = e;
 						int lastIdx = idx;
-						for (HashEntry<K, V> last = next; last != null; last = last.next) {
+						for (HashEntry last = next; last != null; last = last.next) {
 							int k = last.hash & sizeMask;
 							if (k != lastIdx) {
 								lastIdx = k;
@@ -399,10 +354,10 @@ public class ConcurrentCache<K, V> implements Serializable {
 						newTable.set(lastIdx, lastRun);
 
 						// Clone all remaining nodes
-						for (HashEntry<K, V> p = e; p != lastRun; p = p.next) {
+						for (HashEntry p = e; p != lastRun; p = p.next) {
 							int k = p.hash & sizeMask;
-							HashEntry<K, V> n = newTable.get(k);
-							newTable.set(k, new HashEntry<K, V>(p.key, p.hash, n, p.value));
+							HashEntry n = newTable.get(k);
+							newTable.set(k, new HashEntry(p.key, p.hash, n, p.value));
 						}
 					}
 				}
@@ -413,31 +368,31 @@ public class ConcurrentCache<K, V> implements Serializable {
 		/**
 		 * Remove; match on key only if value null, else match both.
 		 */
-		V remove(K key, int hash, V value) {
+		IValue remove(String key, int hash, IValue value) {
 			lock();
 			try {
 				preWriteCleanup(now());
 
 				int c = count - 1;
-				AtomicReferenceArray<HashEntry<K, V>> tab = table;
+				AtomicReferenceArray<HashEntry> tab = table;
 				int index = hash & (tab.length() - 1);
-				HashEntry<K, V> first = tab.get(index);
-				HashEntry<K, V> e = first;
+				HashEntry first = tab.get(index);
+				HashEntry e = first;
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				V oldValue = null;
+				IValue oldValue = null;
 				if (e != null) {
-					V v = e.value;
+					IValue v = e.value;
 					if (value == null || value.equals(v)) {
 						oldValue = v;
 						// All entries following removed node can stay
 						// in list, but all preceding ones need to be
 						// cloned.
 						++modCount;
-						HashEntry<K, V> newFirst = e.next;
-						for (HashEntry<K, V> p = first; p != e; p = p.next)
-							newFirst = new HashEntry<K, V>(p.key, p.hash, newFirst, p.value);
+						HashEntry newFirst = e.next;
+						for (HashEntry p = first; p != e; p = p.next)
+							newFirst = new HashEntry(p.key, p.hash, newFirst, p.value);
 						tab.set(index, newFirst);
 
 						// 从队列移除
@@ -453,28 +408,11 @@ public class ConcurrentCache<K, V> implements Serializable {
 			}
 		}
 
-		void removeEntry(HashEntry<K, V> e, int hash) {
-			int c = count - 1;
-			AtomicReferenceArray<HashEntry<K, V>> tab = table;
-			int index = hash & (tab.length() - 1);
-			HashEntry<K, V> first = tab.get(index);
-
-			++modCount;
-			HashEntry<K, V> newFirst = e.next;
-			for (HashEntry<K, V> p = first; p != e; p = p.next) {
-				newFirst = new HashEntry<K, V>(p.key, p.hash, newFirst, p.value);
-			}
-			tab.set(index, newFirst);
-			// 从队列移除
-			accessQueue.remove(e);
-			count = c; // write-volatile
-		}
-
 		void clear() {
 			if (count != 0) {
 				lock();
 				try {
-					AtomicReferenceArray<HashEntry<K, V>> tab = table;
+					AtomicReferenceArray<HashEntry> tab = table;
 					for (int i = 0; i < tab.length(); i++)
 						tab.set(i, null);
 
@@ -487,8 +425,22 @@ public class ConcurrentCache<K, V> implements Serializable {
 			}
 		}
 
-		// expiration，过期相关业务
+		<R> R doInSegmentUnderLock(String key, int hash, SegmentLockHandler<R> handler) {
+			lock();
+			preWriteCleanup(now());
+			try {
+				HashEntry e = getFirst(hash);
+				while (e != null && (e.hash != hash || !key.equals(e.key)))
+					e = e.next;
 
+				return handler.doInSegmentUnderLock(e);
+			} finally {
+				unlock();
+				postWriteCleanup();
+			}
+		}
+
+		// expiration，过期相关业务
 		/**
 		 * Cleanup expired entries when the lock is available.
 		 */
@@ -505,29 +457,31 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 		// 调用方都有锁
 		void expireEntries(long now) {
-			ReferenceEntry<K, V> e;
+			ReferenceEntry e;
 			while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
-				// TODO 并发问题 ：简单说：对象过期被删，此时有另一线程仍然持有对象并修改
-				// 1.缓存过期删除
-				// 2.引用对象修改缓存
-				// 3.因对象被删，另一线程从db加载数据
-				// 4.修改缓存写入？其实就是2个对象了。
-				// 强引用解决？
-				// or 修改时isContainValue()判断
-				if (isValueAllPersist(e.getValue())) {
-					removeEntry((HashEntry<K, V>) e, e.getHash());
+				if (e.getValue().isAllPersist()) {
+					removeEntry((HashEntry) e, e.getHash());
 				} else {
 					recordAccess(e);
 				}
 			}
 		}
 
-		boolean isValueAllPersist(V value) {
-			if (value instanceof IValue) {
-				IValue _v = (IValue) value;
-				return _v.isAllPersist();
+		void removeEntry(HashEntry e, int hash) {
+			int c = count - 1;
+			AtomicReferenceArray<HashEntry> tab = table;
+			int index = hash & (tab.length() - 1);
+			HashEntry first = tab.get(index);
+
+			++modCount;
+			HashEntry newFirst = e.next;
+			for (HashEntry p = first; p != e; p = p.next) {
+				newFirst = new HashEntry(p.key, p.hash, newFirst, p.value);
 			}
-			return false;
+			tab.set(index, newFirst);
+			// 从队列移除
+			accessQueue.remove(e);
+			count = c; // write-volatile
 		}
 
 		/**
@@ -587,23 +541,21 @@ public class ConcurrentCache<K, V> implements Serializable {
 		 * 1.记录访问时间<br>
 		 * 2.增加到访问对列的尾部
 		 */
-		void recordAccess(ReferenceEntry<K, V> e) {
+		void recordAccess(ReferenceEntry e) {
 			e.setAccessTime(now());
 			accessQueue.add(e);
 		}
 
-		long now() {
-			return System.nanoTime();
-		}
 	}
 
 	/* ---------------- Public operations -------------- */
 
-	public ConcurrentCache(CacheLoader<K, V> loader) {
+	public ConcurrentCache(CacheLoader<String, IValue> loader) {
 		this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, DEFAULT_CONCURRENCY_LEVEL, loader);
 	}
 
-	public ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel, CacheLoader<K, V> loader) {
+	public ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel,
+			CacheLoader<String, IValue> loader) {
 		if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null)
 			throw new IllegalArgumentException();
 
@@ -633,11 +585,11 @@ public class ConcurrentCache<K, V> implements Serializable {
 			cap <<= 1;
 
 		for (int i = 0; i < this.segments.length; ++i)
-			this.segments[i] = new Segment<K, V>(this, cap, loadFactor);
+			this.segments[i] = new Segment(this, cap, loadFactor);
 	}
 
 	public boolean isEmpty() {
-		final Segment<K, V>[] segments = this.segments;
+		final Segment[] segments = this.segments;
 		int[] mc = new int[segments.length];
 		int mcsum = 0;
 		for (int i = 0; i < segments.length; ++i) {
@@ -656,7 +608,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 	}
 
 	public int size() {
-		final Segment<K, V>[] segments = this.segments;
+		final Segment[] segments = this.segments;
 		long sum = 0;
 		long check = 0;
 		int[] mc = new int[segments.length];
@@ -697,7 +649,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 			return (int) sum;
 	}
 
-	public V get(K key) {
+	public IValue get(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, true);
 	}
@@ -708,17 +660,17 @@ public class ConcurrentCache<K, V> implements Serializable {
 	 * @param key
 	 * @return
 	 */
-	public V getIfPresent(K key) {
+	public IValue getIfPresent(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, false);
 	}
 
-	public boolean containsKey(K key) {
+	public boolean containsKey(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).containsKey(key, hash);
 	}
 
-	public V put(K key, V value) {
+	public IValue put(String key, IValue value) {
 		if (value == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
@@ -732,42 +684,67 @@ public class ConcurrentCache<K, V> implements Serializable {
 	 * @param value
 	 * @return
 	 */
-	public V putIfAbsent(K key, V value) {
+	public IValue putIfAbsent(String key, IValue value) {
 		if (value == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).put(key, hash, value, true);
 	}
 
-	public void putAll(Map<? extends K, ? extends V> m) {
-		for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
-			put(e.getKey(), e.getValue());
-	}
-
-	public V remove(K key) {
+	public IValue remove(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).remove(key, hash, null);
 	}
 
-	public boolean remove(K key, V value) {
+	public boolean remove(String key, IValue value) {
 		int hash = rehash(key.hashCode());
 		if (value == null)
 			return false;
 		return segmentFor(hash).remove(key, hash, value) != null;
 	}
 
-	public boolean replace(K key, V oldValue, V newValue) {
+	public boolean replace(String key, final IValue oldValue, final IValue newValue) {
 		if (oldValue == null || newValue == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
-		return segmentFor(hash).replace(key, hash, oldValue, newValue);
+		return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
+			@Override
+			public Boolean doInSegmentUnderLock(HashEntry e) {
+				boolean replaced = false;
+				if (e != null && oldValue.equals(e.value)) {
+					replaced = true;
+					e.value = newValue;
+				}
+				return replaced;
+			}
+		});
 	}
 
-	public V replace(K key, V value) {
-		if (value == null)
-			throw new NullPointerException();
+	public void changeDbState(final CacheEntry entry, final DBState dbState) {
+		final String key = entry.getAttachedKey();
 		int hash = rehash(key.hashCode());
-		return segmentFor(hash).replace(key, hash, value);
+		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+			@Override
+			public Void doInSegmentUnderLock(HashEntry e) {
+				if (e != null && !isExpired(e, now())) {
+					if (e.value == entry) {
+						entry.setDbState(dbState);
+						return null;
+					} else if (e.value instanceof ListValue) {
+						@SuppressWarnings("unchecked")
+						List<? extends CacheEntry> allObjects = ((ListValue<? extends CacheEntry>) e.value)
+								.getAllObjects();
+						for (CacheEntry cacheEntry : allObjects) {
+							if (cacheEntry == entry) {
+								cacheEntry.setDbState(dbState);
+								return null;
+							}
+						}
+					}
+				}
+				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
+			}
+		});
 	}
 
 	public void clear() {
@@ -777,7 +754,11 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 	/* ---------------- expiration ---------------- */
 
-	boolean isExpired(ReferenceEntry<K, V> entry, long now) {
+	static long now() {
+		return System.nanoTime();
+	}
+
+	boolean isExpired(ReferenceEntry entry, long now) {
 		if (now - entry.getAccessTime() > expireAfterAccessNanos) {
 			return true;
 		}
@@ -786,7 +767,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 	/* ---------------- Queue -------------- */
 
-	interface ReferenceEntry<K, V> {
+	interface ReferenceEntry {
 		/*
 		 * Used by entries that use access order. Access entries are maintained
 		 * in a doubly-linked list. New entries are added at the tail of the
@@ -796,13 +777,13 @@ public class ConcurrentCache<K, V> implements Serializable {
 		 * 插入到尾部，过期从首部
 		 */
 
-		K getKey();
+		String getKey();
 
-		V getValue();
+		IValue getValue();
 
 		int getHash();
 
-		ReferenceEntry<K, V> getNext();
+		ReferenceEntry getNext();
 
 		/**
 		 * Returns the time that this entry was last accessed, in ns.
@@ -817,40 +798,40 @@ public class ConcurrentCache<K, V> implements Serializable {
 		/**
 		 * Returns the next entry in the access queue.
 		 */
-		ReferenceEntry<K, V> getNextInAccessQueue();
+		ReferenceEntry getNextInAccessQueue();
 
 		/**
 		 * Sets the next entry in the access queue.
 		 */
-		void setNextInAccessQueue(ReferenceEntry<K, V> next);
+		void setNextInAccessQueue(ReferenceEntry next);
 
 		/**
 		 * Returns the previous entry in the access queue.
 		 */
-		ReferenceEntry<K, V> getPreviousInAccessQueue();
+		ReferenceEntry getPreviousInAccessQueue();
 
 		/**
 		 * Sets the previous entry in the access queue.
 		 */
-		void setPreviousInAccessQueue(ReferenceEntry<K, V> previous);
+		void setPreviousInAccessQueue(ReferenceEntry previous);
 
 	}
 
-	private enum NullEntry implements ReferenceEntry<Object, Object> {
+	private enum NullEntry implements ReferenceEntry {
 		INSTANCE;
 
 		@Override
-		public Object getKey() {
+		public String getKey() {
 			return null;
 		}
 
 		@Override
-		public Object getValue() {
+		public IValue getValue() {
 			return null;
 		}
 
 		@Override
-		public ReferenceEntry<Object, Object> getNext() {
+		public ReferenceEntry getNext() {
 			return null;
 		}
 
@@ -869,46 +850,45 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		public ReferenceEntry<Object, Object> getNextInAccessQueue() {
+		public ReferenceEntry getNextInAccessQueue() {
 			return this;
 		}
 
 		@Override
-		public void setNextInAccessQueue(ReferenceEntry<Object, Object> next) {
+		public void setNextInAccessQueue(ReferenceEntry next) {
 		}
 
 		@Override
-		public ReferenceEntry<Object, Object> getPreviousInAccessQueue() {
+		public ReferenceEntry getPreviousInAccessQueue() {
 			return this;
 		}
 
 		@Override
-		public void setPreviousInAccessQueue(ReferenceEntry<Object, Object> previous) {
+		public void setPreviousInAccessQueue(ReferenceEntry previous) {
 		}
 
 	}
 
-	@SuppressWarnings("unchecked")
 	// impl never uses a parameter or returns any non-null value
-	static <K, V> ReferenceEntry<K, V> nullEntry() {
-		return (ReferenceEntry<K, V>) NullEntry.INSTANCE;
+	static ReferenceEntry nullEntry() {
+		return (ReferenceEntry) NullEntry.INSTANCE;
 	}
 
-	static final class AccessQueue<K, V> extends AbstractQueue<ReferenceEntry<K, V>> {
-		final ReferenceEntry<K, V> head = new ReferenceEntry<K, V>() {
+	static final class AccessQueue extends AbstractQueue<ReferenceEntry> {
+		final ReferenceEntry head = new ReferenceEntry() {
 
 			@Override
-			public K getKey() {
+			public String getKey() {
 				return null;
 			}
 
 			@Override
-			public V getValue() {
+			public IValue getValue() {
 				return null;
 			}
 
 			@Override
-			public ReferenceEntry<K, V> getNext() {
+			public ReferenceEntry getNext() {
 				return nullEntry();
 			}
 
@@ -925,27 +905,27 @@ public class ConcurrentCache<K, V> implements Serializable {
 			public void setAccessTime(long time) {
 			}
 
-			ReferenceEntry<K, V> nextAccess = this;
+			ReferenceEntry nextAccess = this;
 
 			@Override
-			public ReferenceEntry<K, V> getNextInAccessQueue() {
+			public ReferenceEntry getNextInAccessQueue() {
 				return nextAccess;
 			}
 
 			@Override
-			public void setNextInAccessQueue(ReferenceEntry<K, V> next) {
+			public void setNextInAccessQueue(ReferenceEntry next) {
 				this.nextAccess = next;
 			}
 
-			ReferenceEntry<K, V> previousAccess = this;
+			ReferenceEntry previousAccess = this;
 
 			@Override
-			public ReferenceEntry<K, V> getPreviousInAccessQueue() {
+			public ReferenceEntry getPreviousInAccessQueue() {
 				return previousAccess;
 			}
 
 			@Override
-			public void setPreviousInAccessQueue(ReferenceEntry<K, V> previous) {
+			public void setPreviousInAccessQueue(ReferenceEntry previous) {
 				this.previousAccess = previous;
 			}
 		};
@@ -953,7 +933,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 		// implements Queue
 
 		@Override
-		public boolean offer(ReferenceEntry<K, V> entry) {
+		public boolean offer(ReferenceEntry entry) {
 			// unlink
 			connectAccessOrder(entry.getPreviousInAccessQueue(), entry.getNextInAccessQueue());
 
@@ -965,14 +945,14 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		public ReferenceEntry<K, V> peek() {
-			ReferenceEntry<K, V> next = head.getNextInAccessQueue();
+		public ReferenceEntry peek() {
+			ReferenceEntry next = head.getNextInAccessQueue();
 			return (next == head) ? null : next;
 		}
 
 		@Override
-		public ReferenceEntry<K, V> poll() {
-			ReferenceEntry<K, V> next = head.getNextInAccessQueue();
+		public ReferenceEntry poll() {
+			ReferenceEntry next = head.getNextInAccessQueue();
 			if (next == head) {
 				return null;
 			}
@@ -982,11 +962,10 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		@SuppressWarnings({ "rawtypes", "unchecked" })
 		public boolean remove(Object o) {
-			ReferenceEntry<K, V> e = (ReferenceEntry) o;
-			ReferenceEntry<K, V> previous = e.getPreviousInAccessQueue();
-			ReferenceEntry<K, V> next = e.getNextInAccessQueue();
+			ReferenceEntry e = (ReferenceEntry) o;
+			ReferenceEntry previous = e.getPreviousInAccessQueue();
+			ReferenceEntry next = e.getNextInAccessQueue();
 			connectAccessOrder(previous, next);
 			nullifyAccessOrder(e);
 
@@ -994,9 +973,8 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		@SuppressWarnings({ "rawtypes", "unchecked" })
 		public boolean contains(Object o) {
-			ReferenceEntry<K, V> e = (ReferenceEntry) o;
+			ReferenceEntry e = (ReferenceEntry) o;
 			return e.getNextInAccessQueue() != NullEntry.INSTANCE;
 		}
 
@@ -1008,7 +986,7 @@ public class ConcurrentCache<K, V> implements Serializable {
 		@Override
 		public int size() {
 			int size = 0;
-			for (ReferenceEntry<K, V> e = head.getNextInAccessQueue(); e != head; e = e.getNextInAccessQueue()) {
+			for (ReferenceEntry e = head.getNextInAccessQueue(); e != head; e = e.getNextInAccessQueue()) {
 				size++;
 			}
 			return size;
@@ -1016,9 +994,9 @@ public class ConcurrentCache<K, V> implements Serializable {
 
 		@Override
 		public void clear() {
-			ReferenceEntry<K, V> e = head.getNextInAccessQueue();
+			ReferenceEntry e = head.getNextInAccessQueue();
 			while (e != head) {
-				ReferenceEntry<K, V> next = e.getNextInAccessQueue();
+				ReferenceEntry next = e.getNextInAccessQueue();
 				nullifyAccessOrder(e);
 				e = next;
 			}
@@ -1028,25 +1006,29 @@ public class ConcurrentCache<K, V> implements Serializable {
 		}
 
 		@Override
-		public Iterator<ReferenceEntry<K, V>> iterator() {
-			return new AbstractSequentialIterator<ReferenceEntry<K, V>>(peek()) {
+		public Iterator<ReferenceEntry> iterator() {
+			return new AbstractSequentialIterator<ReferenceEntry>(peek()) {
 				@Override
-				protected ReferenceEntry<K, V> computeNext(ReferenceEntry<K, V> previous) {
-					ReferenceEntry<K, V> next = previous.getNextInAccessQueue();
+				protected ReferenceEntry computeNext(ReferenceEntry previous) {
+					ReferenceEntry next = previous.getNextInAccessQueue();
 					return (next == head) ? null : next;
 				}
 			};
 		}
 	}
 
-	static <K, V> void connectAccessOrder(ReferenceEntry<K, V> previous, ReferenceEntry<K, V> next) {
+	static void connectAccessOrder(ReferenceEntry previous, ReferenceEntry next) {
 		previous.setNextInAccessQueue(next);
 		next.setPreviousInAccessQueue(previous);
 	}
 
-	static <K, V> void nullifyAccessOrder(ReferenceEntry<K, V> nulled) {
-		ReferenceEntry<K, V> nullEntry = nullEntry();
+	static void nullifyAccessOrder(ReferenceEntry nulled) {
+		ReferenceEntry nullEntry = nullEntry();
 		nulled.setNextInAccessQueue(nullEntry);
 		nulled.setPreviousInAccessQueue(nullEntry);
+	}
+
+	static interface SegmentLockHandler<R> {
+		R doInSegmentUnderLock(HashEntry e);
 	}
 }

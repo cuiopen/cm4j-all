@@ -51,10 +51,10 @@ public class PersistCacheTest {
 
 	@Test
 	public void addTest() {
-		TestTable test = new TestTable(3, (long) 4);
+		TestTable test = new TestTable(6, (long) 6);
 		TableIdCache desc = new TableIdCache(3);
 		PersistCache.getInstance().put(desc, test);
-		test.setDbState(DBState.U);
+		test.changeDbState(DBState.U);
 		TestTable testTable = PersistCache.getInstance().get(desc);
 		Assert.assertTrue(testTable == test);
 	}
@@ -81,6 +81,8 @@ public class PersistCacheTest {
 		barrier.await();
 		long end = System.nanoTime();
 
+		PersistCache.getInstance().stop();
+
 		TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
 
 		System.out.println("=========" + table.getNValue());
@@ -98,15 +100,32 @@ public class PersistCacheTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 1000; i++) {
+				for (int i = 0; i < 10000; i++) {
 					TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
 					table.increaseValue();
 					// 为增加并发异常，暂停100ms
-					Thread.sleep(10);
+					// Thread.sleep(10);
 				}
 				barrier.await();
 			} catch (Exception e) {
 			}
+		}
+	}
+
+	@Test
+	public void concurrentTest() throws InterruptedException, BrokenBarrierException {
+		TableValueCache desc = new TableValueCache(1);
+		PersistCache.getInstance().get(desc);
+		
+		new Thread(new concurrentThread(),"update thread").start();
+		System.out.println(PersistCache.getInstance().contains(new TableIdCache(1)));;
+	}
+
+	public class concurrentThread implements Runnable {
+		@Override
+		public void run() {
+			TestTable table = PersistCache.getInstance().get(new TableIdCache(1));
+			table.changeDbState(DBState.U);
 		}
 	}
 }

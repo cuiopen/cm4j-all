@@ -1,8 +1,6 @@
 package com.cm4j.test.guava.consist;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import com.cm4j.test.guava.consist.entity.IEntity;
 
@@ -25,62 +23,22 @@ public abstract class CacheEntry {
 	 */
 	private final AtomicInteger numInUpdateQueue = new AtomicInteger(0);
 
-	private final Lock lock = new ReentrantLock();
-
 	/**
-	 * expire设置DB状态为P，能获取到锁则修改
+	 * 此对象所依附的key
 	 */
-	void setDbPersist() {
-		// 能获取到锁则修改
-		if (lock.tryLock()) {
-			try {
-				this.dbState = DBState.P;
-			} finally {
-				lock.unlock();
-			}
-		}
-	}
+	private String attachedKey;
 
 	AtomicInteger getNumInUpdateQueue() {
 		return numInUpdateQueue;
 	}
 
-	public Lock getLock() {
-		return lock;
-	}
-
-	public DBState getDbState() {
-		return dbState;
-	}
-
-	public void setDbState(DBState state) {
-		setDbState(state, true);
-	}
-
 	/**
-	 * 修改db状态，注意：缓存中必须有此对象才可修改db状态
+	 * 修改db状态缓存时必须存在此对象
 	 * 
-	 * @param state
-	 * @param isCheckInCache
-	 *            校验是否在缓存中
+	 * @param dbState
 	 */
-	public void setDbState(DBState state, boolean isCheckInCache) {
-		lock.lock();
-		try {
-			this.dbState = state;
-			if (state != DBState.P) {
-				// TODO 缓存中不存在判断的时候不允许修改
-				// 不能用isContainKey，用isContainValue()来判断缓存是否存在
-				
-				// if (StringUtils.isBlank(attachedKey) ||
-				// !PersistCache.getInstance().contains(attachedKey)) {
-				// throw new RuntimeException("缓存中不存在此对象，无法修改状态");
-				// }
-				PersistCache.getInstance().sendToUpdateQueue(this);
-			}
-		} finally {
-			lock.unlock();
-		}
+	public void changeDbState(DBState dbState) {
+		PersistCache.getInstance().changeDbState(this, dbState);
 	}
 
 	/**
@@ -88,5 +46,21 @@ public abstract class CacheEntry {
 	 * 
 	 * @return
 	 */
-	protected abstract IEntity parseEntity();
+	public abstract IEntity parseEntity();
+
+	public String getAttachedKey() {
+		return attachedKey;
+	}
+
+	public void setAttachedKey(String attachedKey) {
+		this.attachedKey = attachedKey;
+	}
+
+	public DBState getDbState() {
+		return dbState;
+	}
+
+	public void setDbState(DBState dbState) {
+		this.dbState = dbState;
+	}
 }

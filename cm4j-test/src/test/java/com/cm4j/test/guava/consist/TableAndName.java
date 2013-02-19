@@ -35,7 +35,7 @@ public class TableAndName extends SingleValue {
 	}
 
 	@Override
-	protected IEntity parseEntity() {
+	public IEntity parseEntity() {
 		return new TestTable(id, value);
 	}
 }

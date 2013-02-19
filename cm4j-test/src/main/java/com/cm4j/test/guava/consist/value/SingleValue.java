@@ -16,4 +16,11 @@ public abstract class SingleValue extends CacheEntry implements IValue {
 	public boolean isAllPersist() {
 		return DBState.P == getDbState();
 	}
+
+	@Override
+	public void persist() {
+		// TODO 持久化
+
+		changeDbState(DBState.P);
+	};
 }

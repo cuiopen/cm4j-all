@@ -63,14 +63,11 @@ public class TestTable extends SingleValue implements IEntity {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	public void increaseValue() {
-		getLock().lock();
-
+	public synchronized void increaseValue() {
 		this.NValue++;
-		logger.debug("" + this);
+//		logger.debug("" + this);
 
-		setDbState(DBState.U);
-		getLock().unlock();
+		changeDbState(DBState.U);
 	}
 
 	@Override

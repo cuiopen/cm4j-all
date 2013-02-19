@@ -20,6 +20,11 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	private CopyOnWriteArrayList<E> all_objects = new CopyOnWriteArrayList<E>();
 
 	/**
+	 * 此对象所依附的key
+	 */
+	private String attachedKey;
+
+	/**
 	 * 初始化
 	 * 
 	 * @param all_objects
@@ -29,9 +34,6 @@ public class ListValue<E extends CacheEntry> implements IValue {
 			throw new IllegalArgumentException("cache wrap must not be null");
 		}
 		this.all_objects.addAll(all_objects);
-		for (E cached : all_objects) {
-			cached.setDbState(DBState.P);
-		}
 	}
 
 	/**
@@ -50,10 +52,11 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	 */
 	public void delete(E e) {
 		if (!all_objects.contains(e)) {
-			throw new RuntimeException("cache object is not exist,can not delete it");
+			throw new RuntimeException("ListValue中不包含此对象，无法删除");
 		}
+		// 注意顺序，先remove再change
+		e.changeDbState(DBState.D);
 		all_objects.remove(e);
-		e.setDbState(DBState.D);
 	}
 
 	/**
@@ -63,27 +66,39 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	 */
 	public void saveOrUpdate(E e) {
 		if (!all_objects.contains(e)) {
+			e.setAttachedKey(attachedKey);
 			all_objects.add(e);
 		}
-		e.setDbState(DBState.U);
+		e.changeDbState(DBState.U);
 	}
 
 	@Override
 	public boolean isAllPersist() {
 		for (E e : all_objects) {
-			e.getLock().lock();
-		}
-		try {
-			for (E e : all_objects) {
-				if (DBState.P != e.getDbState()) {
-					return false;
-				}
-			}
-			return true;
-		} finally {
-			for (E e : all_objects) {
-				e.getLock().unlock();
+			if (DBState.P != e.getDbState()) {
+				return false;
 			}
 		}
+		return true;
+	}
+
+	@Override
+	public void persist() {
+		for (E e : all_objects) {
+			if (DBState.P != e.getDbState()) {
+				// TODO 持久化
+				e.parseEntity();
+				e.setDbState(DBState.P);
+			}
+		}
+	}
+
+	public String getAttachedKey() {
+		return attachedKey;
+	}
+
+	@Override
+	public void setAttachedKey(String attachedKey) {
+		this.attachedKey = attachedKey;
 	}
 }
