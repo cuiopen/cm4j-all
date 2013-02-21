@@ -26,7 +26,7 @@ public class TableValueCache extends CacheDescriptor<ListReference<TestTable>> {
 	}
 
 	public TestTable findById(int id) {
-		ListReference<TestTable> all = PersistCache.getInstance().get(this);
+		ListReference<TestTable> all = ConcurrentCache.getInstance().get(this);
 		for (TestTable _testTable : all.get()) {
 			if (_testTable.getNId() == id) {
 				return _testTable;

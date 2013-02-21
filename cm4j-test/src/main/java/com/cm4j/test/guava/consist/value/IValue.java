@@ -29,11 +29,6 @@ public interface IValue {
 	boolean isAllPersist();
 	
 	/**
-	 * 立即持久化
-	 */
-	void persist();
-	
-	/**
 	 * 设置对应的缓存key
 	 * 
 	 * @param attachedKey

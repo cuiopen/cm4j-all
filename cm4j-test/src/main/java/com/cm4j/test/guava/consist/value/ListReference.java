@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.DBState;
-import com.cm4j.test.guava.consist.PersistCache;
 
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
@@ -58,7 +58,7 @@ public class ListReference<E extends CacheEntry> implements IValue {
 			throw new RuntimeException("ListValue中不包含此对象，无法删除");
 		}
 		// 注意顺序，先remove再change
-		PersistCache.getInstance().changeDbState(e, DBState.D);
+		ConcurrentCache.getInstance().changeDbState(e, DBState.D, false);
 		all_objects.remove(e);
 	}
 
@@ -72,7 +72,7 @@ public class ListReference<E extends CacheEntry> implements IValue {
 			e.setAttachedKey(attachedKey);
 			all_objects.add(e);
 		}
-		PersistCache.getInstance().changeDbState(e, DBState.U);
+		ConcurrentCache.getInstance().changeDbState(e, DBState.U, false);
 	}
 
 	@Override
@@ -83,17 +83,6 @@ public class ListReference<E extends CacheEntry> implements IValue {
 			}
 		}
 		return true;
-	}
-
-	@Override
-	public void persist() {
-		for (E e : all_objects) {
-			if (DBState.P != e.getDbState()) {
-				// TODO 持久化
-				e.parseEntity();
-				e.setDbState(DBState.P);
-			}
-		}
 	}
 
 	public String getAttachedKey() {

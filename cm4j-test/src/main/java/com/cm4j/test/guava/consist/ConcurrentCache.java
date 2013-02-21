@@ -2,24 +2,45 @@ package com.cm4j.test.guava.consist;
 
 import java.io.Serializable;
 import java.util.AbstractQueue;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.jboss.netty.handler.timeout.ReadTimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
+import com.cm4j.test.guava.consist.loader.CacheValueLoader;
+import com.cm4j.test.guava.consist.loader.PrefixMappping;
 import com.cm4j.test.guava.consist.value.IValue;
 import com.cm4j.test.guava.consist.value.ListReference;
 import com.cm4j.test.guava.consist.value.SingleReference;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
- * 提供put、get、expire操作
+ * <pre>
+ * 读写分离：
+ * 读取：{@link ConcurrentCache}提供get or load、put、expire操作
+ * 
+ * 写入：是由{@link CacheEntry#changeDbState(DBState)}控制对象状态
+ * 同时{@link PersistCache}独立维护了一份写入队列，独立于缓存操作
+ * 
+ * 使用流程：
+ * 1.定义缓存描述信息{@link CacheDescriptor}
+ * 2.定义映射{@link PrefixMappping}
+ * </pre>
  * 
  * @author Yang.hao
  * @since 2013-1-30 上午11:25:47
@@ -28,7 +49,13 @@ import com.google.common.collect.AbstractSequentialIterator;
  * @param <IValue>
  */
 public class ConcurrentCache {
-	
+
+	private static final ConcurrentCache instance = new ConcurrentCache(new CacheValueLoader());
+
+	public static ConcurrentCache getInstance() {
+		return instance;
+	}
+
 	/* ---------------- Constants -------------- */
 	static final int DEFAULT_INITIAL_CAPACITY = 16;
 	static final float DEFAULT_LOAD_FACTOR = 0.75f;
@@ -44,6 +71,11 @@ public class ConcurrentCache {
 	final Segment[] segments;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
 	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(30);
+
+	private final ConcurrentLinkedQueue<CacheEntryWrapper> updateQueue;
+	private final ScheduledExecutorService service;
+	private final Runnable consumeRunnable;
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	/* ---------------- Small Utilities -------------- */
 	private static int rehash(int h) {
@@ -421,7 +453,7 @@ public class ConcurrentCache {
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				return handler.doInSegmentUnderLock(e);
+				return handler.doInSegmentUnderLock(this, e);
 			} finally {
 				unlock();
 				postWriteCleanup();
@@ -572,27 +604,24 @@ public class ConcurrentCache {
 		while (cap < c)
 			cap <<= 1;
 
-		for (int i = 0; i < this.segments.length; ++i)
+		for (int i = 0; i < this.segments.length; ++i) {
 			this.segments[i] = new Segment(this, cap, loadFactor);
-	}
+		}
 
-	public boolean isEmpty() {
-		final Segment[] segments = this.segments;
-		int[] mc = new int[segments.length];
-		int mcsum = 0;
-		for (int i = 0; i < segments.length; ++i) {
-			if (segments[i].count != 0)
-				return false;
-			else
-				mcsum += mc[i] = segments[i].modCount;
-		}
-		if (mcsum != 0) {
-			for (int i = 0; i < segments.length; ++i) {
-				if (segments[i].count != 0 || mc[i] != segments[i].modCount)
-					return false;
+		// 更新队列
+		updateQueue = new ConcurrentLinkedQueue<CacheEntryWrapper>();
+
+		// 更新队列处理线程
+		consumeRunnable = new Runnable() {
+			@Override
+			public void run() {
+				consumeUpdateQueue();
 			}
-		}
-		return true;
+		};
+
+		// 定时处理器
+		service = Executors.newScheduledThreadPool(1);
+		service.scheduleAtFixedRate(consumeRunnable, 1, 50, TimeUnit.SECONDS);
 	}
 
 	public int size() {
@@ -642,6 +671,11 @@ public class ConcurrentCache {
 		return segmentFor(hash).get(key, hash, loader, true);
 	}
 
+	@SuppressWarnings("unchecked")
+	public <V extends IValue> V get(CacheDescriptor<V> desc) {
+		return (V) get(desc.getKey());
+	}
+
 	/**
 	 * 存在即获取
 	 * 
@@ -653,11 +687,6 @@ public class ConcurrentCache {
 		return segmentFor(hash).get(key, hash, loader, false);
 	}
 
-	public boolean containsKey(String key) {
-		int hash = rehash(key.hashCode());
-		return segmentFor(hash).containsKey(key, hash);
-	}
-
 	public IValue put(String key, IValue value) {
 		if (value == null)
 			throw new NullPointerException();
@@ -665,18 +694,80 @@ public class ConcurrentCache {
 		return segmentFor(hash).put(key, hash, value, false);
 	}
 
+	public void put(CacheDescriptor<? extends IValue> desc, IValue value) {
+		put(desc.getKey(), value);
+	}
+
 	/**
 	 * 不存在时放入缓存
-	 * 
-	 * @param key
-	 * @param value
-	 * @return
 	 */
 	public IValue putIfAbsent(String key, IValue value) {
 		if (value == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).put(key, hash, value, true);
+	}
+
+	/**
+	 * 先持久化再移除
+	 * 
+	 * @param <V>
+	 * @param desc
+	 */
+	public void persistAndRemove(CacheDescriptor<? extends IValue> desc) {
+		if (contains(desc)) {
+			String key = desc.getKey();
+			final int hash = rehash(key.hashCode());
+			segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+				@SuppressWarnings({ "rawtypes", "unchecked" })
+				@Override
+				public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
+					if (e != null && e.value != null && !e.value.isAllPersist()) {
+						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+						if (e.value instanceof SingleReference) {
+							CacheEntry entry = ((SingleReference) e.value).get();
+							IEntity entity = entry.parseEntity();
+							hibernate.saveOrUpdate(entity);
+							entry.setDbState(DBState.P);
+							// 占位：发送到更新队列，状态P
+							sendToUpdateQueue(entry);
+						} else if (e.value instanceof ListReference) {
+							List<? extends CacheEntry> list = ((ListReference<? extends CacheEntry>) e.value).get();
+							for (CacheEntry entry : list) {
+								if (DBState.P != entry.getDbState()) {
+									IEntity entity = entry.parseEntity();
+									hibernate.saveOrUpdate(entity);
+									entry.setDbState(DBState.P);
+									// 占位：发送到更新队列，状态P
+									sendToUpdateQueue(entry);
+								}
+							}
+						} else {
+							throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
+						}
+						segment.removeEntry(e, hash);
+					}
+					return null;
+				}
+			});
+		}
+	}
+
+	public boolean replace(String key, final IValue oldValue, final IValue newValue) {
+		if (oldValue == null || newValue == null)
+			throw new NullPointerException();
+		int hash = rehash(key.hashCode());
+		return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
+			@Override
+			public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
+				boolean replaced = false;
+				if (e != null && oldValue.equals(e.value)) {
+					replaced = true;
+					e.value = newValue;
+				}
+				return replaced;
+			}
+		});
 	}
 
 	public IValue remove(String key) {
@@ -691,49 +782,8 @@ public class ConcurrentCache {
 		return segmentFor(hash).remove(key, hash, value) != null;
 	}
 
-	public boolean replace(String key, final IValue oldValue, final IValue newValue) {
-		if (oldValue == null || newValue == null)
-			throw new NullPointerException();
-		int hash = rehash(key.hashCode());
-		return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
-			@Override
-			public Boolean doInSegmentUnderLock(HashEntry e) {
-				boolean replaced = false;
-				if (e != null && oldValue.equals(e.value)) {
-					replaced = true;
-					e.value = newValue;
-				}
-				return replaced;
-			}
-		});
-	}
-
-	public void changeDbState(final CacheEntry entry, final DBState dbState) {
-		final String key = entry.getAttachedKey();
-		int hash = rehash(key.hashCode());
-		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
-			@Override
-			public Void doInSegmentUnderLock(HashEntry e) {
-				if (e != null && !isExpired(e, now())) {
-					// 更改CacheEntry的状态
-					if (e.value instanceof SingleReference) {
-						entry.setDbState(dbState);
-						return null;
-					} else if (e.value instanceof ListReference) {
-						@SuppressWarnings("unchecked")
-						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value)
-								.get();
-						for (CacheEntry cacheEntry : allObjects) {
-							if (cacheEntry == entry) {
-								cacheEntry.setDbState(dbState);
-								return null;
-							}
-						}
-					}
-				}
-				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
-			}
-		});
+	public void remove(CacheDescriptor<? extends IValue> desc) {
+		remove(desc.getKey());
 	}
 
 	public void clear() {
@@ -741,13 +791,88 @@ public class ConcurrentCache {
 			segments[i].clear();
 	}
 
+	public boolean containsKey(String key) {
+		int hash = rehash(key.hashCode());
+		return segmentFor(hash).containsKey(key, hash);
+	}
+
+	public boolean contains(CacheDescriptor<? extends IValue> cacheDesc) {
+		return containsKey(cacheDesc.getKey());
+	}
+
+	public boolean isEmpty() {
+		final Segment[] segments = this.segments;
+		int[] mc = new int[segments.length];
+		int mcsum = 0;
+		for (int i = 0; i < segments.length; ++i) {
+			if (segments[i].count != 0)
+				return false;
+			else
+				mcsum += mc[i] = segments[i].modCount;
+		}
+		if (mcsum != 0) {
+			for (int i = 0; i < segments.length; ++i) {
+				if (segments[i].count != 0 || mc[i] != segments[i].modCount)
+					return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * 更改db状态并发送到更新队列，缓存不应直接调用此方法
+	 * 
+	 * @param entry
+	 * @param dbState
+	 * @param placeholderPersistCacheEntry
+	 *            将P状态CacheEntry也发送到队列占位
+	 */
+	public void changeDbState(final CacheEntry entry, final DBState dbState, final boolean placeholderPersistCacheEntry) {
+		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
+		Preconditions.checkNotNull(dbState, "DbState不允许为null");
+		Preconditions.checkNotNull(placeholderPersistCacheEntry || DBState.P != dbState, "DbState不允许为持久化");
+
+		final String key = entry.getAttachedKey();
+		int hash = rehash(key.hashCode());
+		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+			@Override
+			public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
+				if (e != null && e.value != null && !isExpired(e, now())) {
+					// 更改CacheEntry的状态
+					if (e.value instanceof SingleReference) {
+						entry.setDbState(dbState);
+						if (placeholderPersistCacheEntry || DBState.P != dbState) {
+							sendToUpdateQueue(entry);
+						}
+						return null;
+					} else if (e.value instanceof ListReference) {
+						@SuppressWarnings("unchecked")
+						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value).get();
+						for (CacheEntry cacheEntry : allObjects) {
+							if (cacheEntry == entry) {
+								cacheEntry.setDbState(dbState);
+								if (placeholderPersistCacheEntry || DBState.P != dbState) {
+									sendToUpdateQueue(entry);
+								}
+								return null;
+							}
+						}
+					} else {
+						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
+					}
+				}
+				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
+			}
+		});
+	}
+
 	/* ---------------- expiration ---------------- */
 
-	static long now() {
+	private static long now() {
 		return System.nanoTime();
 	}
 
-	boolean isExpired(ReferenceEntry entry, long now) {
+	private boolean isExpired(ReferenceEntry entry, long now) {
 		if (now - entry.getAccessTime() > expireAfterAccessNanos) {
 			return true;
 		}
@@ -1018,6 +1143,78 @@ public class ConcurrentCache {
 	}
 
 	static interface SegmentLockHandler<R> {
-		R doInSegmentUnderLock(HashEntry e);
+		R doInSegmentUnderLock(Segment segment, HashEntry e);
+	}
+
+	/*
+	 * ================== utils =====================
+	 */
+
+	/**
+	 * 发送到更新队列
+	 * 
+	 * @param entry
+	 */
+	private void sendToUpdateQueue(CacheEntry entry) {
+		entry.getNumInUpdateQueue().incrementAndGet();
+		updateQueue.add(new CacheEntryWrapper(entry));
+	}
+
+	public void stop() {
+		Future<?> future = service.submit(consumeRunnable);
+		try {
+			// 阻塞等待线程完成
+			future.get();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		service.shutdown();
+	}
+
+	/**
+	 * 将更新队列发送给db存储<br>
+	 * 
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private void consumeUpdateQueue() {
+		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
+		CacheEntryWrapper wrapper = null;
+		while ((wrapper = updateQueue.poll()) != null) {
+			CacheEntry entry = wrapper.getEntry();
+			int num = entry.getNumInUpdateQueue().decrementAndGet();
+			// 删除或者更新的num为0
+			// 注意：这里要使用CacheEntryWrapper#DbState，而不要用CacheEntry的DbState
+			if (num == 0) {
+				IEntity entity = entry.parseEntity();
+				if (entity != null && wrapper.getDbState() != DBState.P) {
+					// TODO 发送db去批处理
+					System.out.println(entry.getDbState() + " " + entity.toString());
+
+					HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+					hibernate.saveOrUpdate(entity);
+
+					changeDbState(entry, DBState.P, true);
+				}
+			}
+		}
+	}
+
+	private static class CacheEntryWrapper {
+		private CacheEntry entry;
+		private DBState dbState;
+
+		private CacheEntryWrapper(CacheEntry entry) {
+			this.entry = entry;
+			// new一个CacheEntryWrapper来保存每个entry的dbState
+			this.dbState = entry.getDbState();
+		}
+
+		public CacheEntry getEntry() {
+			return entry;
+		}
+
+		public DBState getDbState() {
+			return dbState;
+		}
 	}
 }

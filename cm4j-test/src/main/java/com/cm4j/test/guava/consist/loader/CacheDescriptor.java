@@ -29,9 +29,9 @@ public abstract class CacheDescriptor<V extends IValue> {
 	public abstract V load(String... params);
 
 	public String getKey() {
-		Preconditions.checkArgument(params.length > 0, "cache entry param's size is 0");
+		Preconditions.checkArgument(params.length > 0, "CacheDescriptor参数不能为0");
 		PrefixMappping mapping = PrefixMappping.getMapping(this);
-		Preconditions.checkNotNull(mapping, "cache's prefix is not mapping");
+		Preconditions.checkNotNull(mapping, "此缓存未在PrefixMappping进行映射：" + this.getClass().getSimpleName());
 		return new JOINER(mapping.name(), params).key();
 	}
 }

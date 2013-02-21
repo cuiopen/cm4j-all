@@ -1,8 +1,8 @@
 package com.cm4j.test.guava.consist.value;
 
 import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.DBState;
-import com.cm4j.test.guava.consist.PersistCache;
 
 /**
  * 单个缓存对象
@@ -12,14 +12,14 @@ import com.cm4j.test.guava.consist.PersistCache;
  * 
  */
 public class SingleReference<V extends CacheEntry> implements IValue {
-	
+
 	private V v;
-	
+
 	/**
 	 * 此对象所依附的key
 	 */
 	private String attachedKey;
-	
+
 	public SingleReference(V value) {
 		this.v = value;
 	}
@@ -29,7 +29,7 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 	public V get() {
 		return v;
 	}
-	
+
 	/**
 	 * 删除
 	 * 
@@ -40,7 +40,7 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 			throw new RuntimeException("SingleValue中不包含对象，无法删除");
 		}
 		// 注意顺序，先remove再change
-		PersistCache.getInstance().changeDbState(v, DBState.D);
+		ConcurrentCache.getInstance().changeDbState(v, DBState.D, false);
 		// TODO 需要拷贝新对象，以防止对象=null？
 		v = null;
 	}
@@ -53,9 +53,8 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 	public void saveOrUpdate(V v) {
 		v.setAttachedKey(attachedKey);
 		this.v = v;
-		PersistCache.getInstance().changeDbState(this.v, DBState.U);
+		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U, false);
 	}
-
 
 	@Override
 	public boolean isAllPersist() {
@@ -63,15 +62,9 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 	}
 
 	@Override
-	public void persist() {
-		// TODO 持久化
-		PersistCache.getInstance().changeDbState(this.v, DBState.P);
-	}
-
-	@Override
 	public void setAttachedKey(String attachedKey) {
 		this.attachedKey = attachedKey;
-		if (v != null){
+		if (v != null) {
 			v.setAttachedKey(attachedKey);
 		}
 	}
