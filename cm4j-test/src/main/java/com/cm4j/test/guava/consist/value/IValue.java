@@ -13,6 +13,14 @@ import com.cm4j.test.guava.consist.DBState;
 public interface IValue {
 
 	/**
+	 * 获取值
+	 * 
+	 * @param <V>
+	 * @return
+	 */
+	<V> V get();
+	
+	/**
 	 * 是否所有对象都与数据库保持一致<br>
 	 * 如果是coll集合，则内部需维持锁的一致性
 	 * 

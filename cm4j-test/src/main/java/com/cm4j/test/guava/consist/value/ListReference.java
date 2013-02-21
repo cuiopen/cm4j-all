@@ -5,6 +5,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.cm4j.test.guava.consist.CacheEntry;
 import com.cm4j.test.guava.consist.DBState;
+import com.cm4j.test.guava.consist.PersistCache;
 
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
@@ -16,7 +17,7 @@ import com.cm4j.test.guava.consist.DBState;
  * @param <E>
  * @param <C>
  */
-public class ListValue<E extends CacheEntry> implements IValue {
+public class ListReference<E extends CacheEntry> implements IValue {
 	private CopyOnWriteArrayList<E> all_objects = new CopyOnWriteArrayList<E>();
 
 	/**
@@ -29,7 +30,7 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	 * 
 	 * @param all_objects
 	 */
-	public ListValue(List<E> all_objects) {
+	public ListReference(List<E> all_objects) {
 		if (all_objects == null) {
 			throw new IllegalArgumentException("cache wrap must not be null");
 		}
@@ -37,11 +38,13 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	}
 
 	/**
-	 * 获取
+	 * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
+	 * {@link #saveOrUpdate(CacheEntry)}
 	 * 
 	 * @return
 	 */
-	public List<E> getAllObjects() {
+	@SuppressWarnings("unchecked")
+	public List<E> get() {
 		return all_objects;
 	}
 
@@ -55,7 +58,7 @@ public class ListValue<E extends CacheEntry> implements IValue {
 			throw new RuntimeException("ListValue中不包含此对象，无法删除");
 		}
 		// 注意顺序，先remove再change
-		e.changeDbState(DBState.D);
+		PersistCache.getInstance().changeDbState(e, DBState.D);
 		all_objects.remove(e);
 	}
 
@@ -69,7 +72,7 @@ public class ListValue<E extends CacheEntry> implements IValue {
 			e.setAttachedKey(attachedKey);
 			all_objects.add(e);
 		}
-		e.changeDbState(DBState.U);
+		PersistCache.getInstance().changeDbState(e, DBState.U);
 	}
 
 	@Override
@@ -100,5 +103,8 @@ public class ListValue<E extends CacheEntry> implements IValue {
 	@Override
 	public void setAttachedKey(String attachedKey) {
 		this.attachedKey = attachedKey;
+		for (E e : all_objects) {
+			e.setAttachedKey(attachedKey);
+		}
 	}
 }

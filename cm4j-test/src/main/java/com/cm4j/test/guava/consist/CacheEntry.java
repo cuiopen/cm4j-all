@@ -33,15 +33,6 @@ public abstract class CacheEntry {
 	}
 
 	/**
-	 * 修改db状态缓存时必须存在此对象
-	 * 
-	 * @param dbState
-	 */
-	public void changeDbState(DBState dbState) {
-		PersistCache.getInstance().changeDbState(this, dbState);
-	}
-
-	/**
 	 * 根据当前缓存对象解析hibernate entity进行数据保存
 	 * 
 	 * @return
@@ -60,7 +51,7 @@ public abstract class CacheEntry {
 		return dbState;
 	}
 
-	public void setDbState(DBState dbState) {
+	public synchronized void setDbState(DBState dbState) {
 		this.dbState = dbState;
 	}
 }

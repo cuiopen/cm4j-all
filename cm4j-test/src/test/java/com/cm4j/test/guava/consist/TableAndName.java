@@ -2,9 +2,8 @@ package com.cm4j.test.guava.consist;
 
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.value.SingleValue;
 
-public class TableAndName extends SingleValue {
+public class TableAndName extends CacheEntry {
 
 	private int id;
 	private long value;

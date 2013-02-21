@@ -14,7 +14,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.value.IValue;
-import com.cm4j.test.guava.consist.value.ListValue;
+import com.cm4j.test.guava.consist.value.ListReference;
+import com.cm4j.test.guava.consist.value.SingleReference;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
@@ -27,8 +28,8 @@ import com.google.common.collect.AbstractSequentialIterator;
  * @param <IValue>
  */
 public class ConcurrentCache {
+	
 	/* ---------------- Constants -------------- */
-
 	static final int DEFAULT_INITIAL_CAPACITY = 16;
 	static final float DEFAULT_LOAD_FACTOR = 0.75f;
 	static final int DEFAULT_CONCURRENCY_LEVEL = 16;
@@ -37,18 +38,12 @@ public class ConcurrentCache {
 	static final int RETRIES_BEFORE_LOCK = 2;
 
 	/* ---------------- Fields -------------- */
-
 	final CacheLoader<String, IValue> loader;
 	final int segmentMask;
 	final int segmentShift;
 	final Segment[] segments;
-
-	transient Set<String> keySet;
-	transient Set<Map.Entry<String, IValue>> entrySet;
-	transient Collection<IValue> values;
-
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(3);
+	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(30);
 
 	/* ---------------- Small Utilities -------------- */
 	private static int rehash(int h) {
@@ -302,13 +297,6 @@ public class ConcurrentCache {
 
 				// 在put的时候对value设置所属key
 				value.setAttachedKey(key);
-				if (value instanceof ListValue<?>) {
-					((ListValue<?>) value).setAttachedKey(key);
-					List<? extends CacheEntry> all = ((ListValue<?>) value).getAllObjects();
-					for (CacheEntry cacheEntry : all) {
-						cacheEntry.setAttachedKey(key);
-					}
-				}
 
 				// 返回旧值
 				return oldValue;
@@ -727,13 +715,14 @@ public class ConcurrentCache {
 			@Override
 			public Void doInSegmentUnderLock(HashEntry e) {
 				if (e != null && !isExpired(e, now())) {
-					if (e.value == entry) {
+					// 更改CacheEntry的状态
+					if (e.value instanceof SingleReference) {
 						entry.setDbState(dbState);
 						return null;
-					} else if (e.value instanceof ListValue) {
+					} else if (e.value instanceof ListReference) {
 						@SuppressWarnings("unchecked")
-						List<? extends CacheEntry> allObjects = ((ListValue<? extends CacheEntry>) e.value)
-								.getAllObjects();
+						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value)
+								.get();
 						for (CacheEntry cacheEntry : allObjects) {
 							if (cacheEntry == entry) {
 								cacheEntry.setDbState(dbState);

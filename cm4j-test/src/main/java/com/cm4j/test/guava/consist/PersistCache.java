@@ -42,7 +42,7 @@ import com.google.common.base.Preconditions;
 public class PersistCache {
 
 	private static class Holder {
-		public static final PersistCache instance = new PersistCache(new CacheValueLoader());
+		static final PersistCache instance = new PersistCache(new CacheValueLoader());
 	}
 
 	public static PersistCache getInstance() {
@@ -127,7 +127,7 @@ public class PersistCache {
 			while (!v.isAllPersist()) {
 				// TODO 先持久化再remove，有可能改了之后有其他线程又修改了:放到segment中
 				// 如何定位到updateQueue中的最后一个，并将它置为P,以防止再次写入:直接插入P做占位
-				// 移除后，再获取修改，这是索引又从0开始，怎么办:用P做占位如：4,3,2,P,3,2,1,U
+				// 移除后，再获取修改，这是索引又从0开始，怎么办:用P做占位如：4,3,2,1,P,2,1,U
 				v.persist();
 			}
 			remove(desc);
@@ -165,7 +165,7 @@ public class PersistCache {
 	 * ================== utils =====================
 	 */
 	/**
-	 * 修改db状态
+	 * 直接发送更新队列，缓存不应直接调用此方法
 	 */
 	public void changeDbState(CacheEntry entry, DBState dbState) {
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry's attachedKey must not null");
@@ -226,16 +226,23 @@ public class PersistCache {
 		}
 	}
 
-	/*
-	 * static class CacheEntryWrapper { private CacheEntry entry; private
-	 * DBState dbState;
-	 * 
-	 * private CacheEntryWrapper(CacheEntry entry) { this.entry = entry; // new
-	 * 一个CacheEntryWrapper来保存每个entry的dbState this.dbState = entry.getDbState();
-	 * }
-	 * 
-	 * public CacheEntry getEntry() { return entry; }
-	 * 
-	 * public DBState getDbState() { return dbState; } }
-	 */
+	static class CacheEntryWrapper {
+		private CacheEntry entry;
+		private DBState dbState;
+
+		private CacheEntryWrapper(CacheEntry entry) {
+			this.entry = entry;
+			// new一个CacheEntryWrapper来保存每个entry的dbState
+			this.dbState = entry.getDbState();
+		}
+
+		public CacheEntry getEntry() {
+			return entry;
+		}
+
+		public DBState getDbState() {
+			return dbState;
+		}
+	}
+
 }

@@ -8,9 +8,10 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.value.SingleReference;
 import com.google.common.base.Preconditions;
 
-public class TableAndNameCache extends CacheDescriptor<TableAndName> {
+public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndName>> {
 
 	public TableAndNameCache(Object... params) {
 		super(params);
@@ -18,7 +19,7 @@ public class TableAndNameCache extends CacheDescriptor<TableAndName> {
 
 	@SuppressWarnings("rawtypes")
 	@Override
-	public TableAndName load(String... params) {
+	public SingleReference<TableAndName> load(String... params) {
 		Preconditions.checkArgument(params.length == 1);
 		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 
@@ -31,7 +32,7 @@ public class TableAndNameCache extends CacheDescriptor<TableAndName> {
 		result.setId(testTable.getNId());
 		result.setName(testName.getSName());
 		result.setValue(testTable.getNValue());
-		return result;
+		return new SingleReference<TableAndName>(result);
 	}
 
 }
