@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.loader;
 
+import com.cm4j.test.guava.consist.IReference;
 import com.cm4j.test.guava.consist.keys.KEYS.JOINER;
-import com.cm4j.test.guava.consist.value.IValue;
 import com.google.common.base.Preconditions;
 
 /**
@@ -11,7 +11,7 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-19 下午01:13:54
  * 
  */
-public abstract class CacheDescriptor<V extends IValue> {
+public abstract class CacheDescriptor<V extends IReference> {
 
 	private Object[] params;
 

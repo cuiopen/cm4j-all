@@ -1,17 +1,18 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.caches;
 
 import java.util.List;
 
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.ServiceManager;
+import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
-import com.cm4j.test.guava.consist.value.SingleReference;
 import com.google.common.base.Preconditions;
 
-public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndName>> {
+public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndNameVO>> {
 
 	public TableAndNameCache(Object... params) {
 		super(params);
@@ -19,7 +20,7 @@ public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndN
 
 	@SuppressWarnings("rawtypes")
 	@Override
-	public SingleReference<TableAndName> load(String... params) {
+	public SingleReference<TableAndNameVO> load(String... params) {
 		Preconditions.checkArgument(params.length == 1);
 		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 
@@ -28,11 +29,11 @@ public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndN
 		Object[] vlaue = (Object[]) all.get(0);
 		TestTable testTable = (TestTable) vlaue[0];
 		TestName testName = (TestName) vlaue[1];
-		TableAndName result = new TableAndName();
+		TableAndNameVO result = new TableAndNameVO();
 		result.setId(testTable.getNId());
 		result.setName(testName.getSName());
 		result.setValue(testTable.getNValue());
-		return new SingleReference<TableAndName>(result);
+		return new SingleReference<TableAndNameVO>(result);
 	}
 
 }

@@ -1,9 +1,9 @@
 package com.cm4j.test.guava.consist.loader;
 
-import com.cm4j.test.guava.consist.TableIdCache;
-import com.cm4j.test.guava.consist.TableAndNameCache;
-import com.cm4j.test.guava.consist.TableValueCache;
-import com.cm4j.test.guava.consist.value.IValue;
+import com.cm4j.test.guava.consist.IReference;
+import com.cm4j.test.guava.consist.caches.TableAndNameCache;
+import com.cm4j.test.guava.consist.caches.TableIdCache;
+import com.cm4j.test.guava.consist.caches.TableValueCache;
 
 /**
  * 缓存前缀与描述的映射
@@ -18,9 +18,9 @@ public enum PrefixMappping {
 	$2(new TableValueCache()),
 	$3(new TableAndNameCache());
 
-	private CacheDescriptor<? extends IValue> cacheDesc;
+	private CacheDescriptor<? extends IReference> cacheDesc;
 
-	PrefixMappping(CacheDescriptor<? extends IValue> cacheDesc) {
+	PrefixMappping(CacheDescriptor<? extends IReference> cacheDesc) {
 		this.cacheDesc = cacheDesc;
 	}
 
@@ -30,7 +30,7 @@ public enum PrefixMappping {
 	 * @param cacheDesc
 	 * @return
 	 */
-	public static PrefixMappping getMapping(CacheDescriptor<? extends IValue> cacheDesc) {
+	public static PrefixMappping getMapping(CacheDescriptor<? extends IReference> cacheDesc) {
 		PrefixMappping[] values = values();
 		for (PrefixMappping value : values) {
 			if (value.getCacheDesc().getClass().isAssignableFrom(cacheDesc.getClass())) {
@@ -40,7 +40,7 @@ public enum PrefixMappping {
 		return null;
 	}
 
-	public CacheDescriptor<? extends IValue> getCacheDesc() {
+	public CacheDescriptor<? extends IReference> getCacheDesc() {
 		return cacheDesc;
 	}
 }

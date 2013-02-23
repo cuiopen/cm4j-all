@@ -2,8 +2,8 @@ package com.cm4j.test.guava.consist.loader;
 
 import org.apache.commons.lang.ArrayUtils;
 
+import com.cm4j.test.guava.consist.IReference;
 import com.cm4j.test.guava.consist.keys.KEYS;
-import com.cm4j.test.guava.consist.value.IValue;
 import com.google.common.base.Preconditions;
 
 /**
@@ -13,10 +13,10 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-19 下午03:34:58
  * 
  */
-public class CacheValueLoader extends CacheLoader<String, IValue> {
+public class CacheValueLoader extends CacheLoader<String, IReference> {
 
 	@Override
-	public IValue load(String key) throws RuntimeException {
+	public IReference load(String key) throws RuntimeException {
 		String[] keyInfo = KEYS.getKeyInfo(key);
 		String prefix = keyInfo[0];
 		String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
@@ -25,7 +25,7 @@ public class CacheValueLoader extends CacheLoader<String, IValue> {
 		Preconditions.checkNotNull(mappping);
 
 		// 这里配的是无参数对象
-		CacheDescriptor<? extends IValue> desc = mappping.getCacheDesc();
+		CacheDescriptor<? extends IReference> desc = mappping.getCacheDesc();
 		return desc.load(params);
 	}
 }

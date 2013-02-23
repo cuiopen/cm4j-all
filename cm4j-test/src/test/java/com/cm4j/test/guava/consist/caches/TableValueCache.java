@@ -1,13 +1,15 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.caches;
 
 import java.util.List;
 
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.ListReference;
+import com.cm4j.test.guava.consist.ServiceManager;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
-import com.cm4j.test.guava.consist.value.ListReference;
 import com.google.common.base.Preconditions;
 
 public class TableValueCache extends CacheDescriptor<ListReference<TestTable>> {

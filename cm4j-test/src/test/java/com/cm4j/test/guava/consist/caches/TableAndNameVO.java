@@ -1,9 +1,10 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.caches;
 
+import com.cm4j.test.guava.consist.CacheEntry;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.entity.TestTable;
 
-public class TableAndName extends CacheEntry {
+public class TableAndNameVO extends CacheEntry {
 
 	private int id;
 	private long value;

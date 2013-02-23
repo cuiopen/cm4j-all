@@ -6,7 +6,8 @@ import com.cm4j.test.guava.consist.entity.IEntity;
 
 /**
  * 单个缓存值，与list相对应<br>
- * 例如数据库中的一行数据
+ * 例如数据库中的一行数据<br>
+ * 注意：此类会被copy，所以不要包含大对象，如logger，以防止效率降低
  * 
  * @author Yang.hao
  * @since 2013-1-18 上午09:25:24
@@ -39,19 +40,19 @@ public abstract class CacheEntry {
 	 */
 	public abstract IEntity parseEntity();
 
-	public String getAttachedKey() {
+	String getAttachedKey() {
 		return attachedKey;
 	}
 
-	public void setAttachedKey(String attachedKey) {
+	void setAttachedKey(String attachedKey) {
 		this.attachedKey = attachedKey;
 	}
 
-	public DBState getDbState() {
+	DBState getDbState() {
 		return dbState;
 	}
 
-	public synchronized void setDbState(DBState dbState) {
+	synchronized void setDbState(DBState dbState) {
 		this.dbState = dbState;
 	}
 }

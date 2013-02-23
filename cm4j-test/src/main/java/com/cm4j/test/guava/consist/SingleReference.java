@@ -1,8 +1,4 @@
-package com.cm4j.test.guava.consist.value;
-
-import com.cm4j.test.guava.consist.CacheEntry;
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.DBState;
+package com.cm4j.test.guava.consist;
 
 /**
  * 单个缓存对象
@@ -11,7 +7,7 @@ import com.cm4j.test.guava.consist.DBState;
  * @since 2013-1-18 上午09:31:51
  * 
  */
-public class SingleReference<V extends CacheEntry> implements IValue {
+public class SingleReference<V extends CacheEntry> implements IReference {
 
 	private V v;
 
@@ -40,9 +36,9 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 			throw new RuntimeException("SingleValue中不包含对象，无法删除");
 		}
 		// 注意顺序，先remove再change
-		ConcurrentCache.getInstance().changeDbState(v, DBState.D, false);
+		ConcurrentCache.getInstance().changeDbState(v, DBState.D);
 		// TODO 需要拷贝新对象，以防止对象=null？
-		v = null;
+		this.v = null;
 	}
 
 	/**
@@ -53,7 +49,7 @@ public class SingleReference<V extends CacheEntry> implements IValue {
 	public void saveOrUpdate(V v) {
 		v.setAttachedKey(attachedKey);
 		this.v = v;
-		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U, false);
+		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
 	}
 
 	@Override

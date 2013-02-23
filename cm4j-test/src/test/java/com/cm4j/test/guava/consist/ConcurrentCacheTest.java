@@ -9,9 +9,11 @@ import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.cm4j.test.guava.consist.caches.TableAndNameCache;
+import com.cm4j.test.guava.consist.caches.TableAndNameVO;
+import com.cm4j.test.guava.consist.caches.TableIdCache;
+import com.cm4j.test.guava.consist.caches.TableValueCache;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.value.ListReference;
-import com.cm4j.test.guava.consist.value.SingleReference;
 
 /**
  * 1.缓存过期了不应该能修改状态? 使用引用队列？<br>
@@ -26,7 +28,7 @@ import com.cm4j.test.guava.consist.value.SingleReference;
 public class ConcurrentCacheTest {
 
 	@Test
-	public void getTest() {
+	public void singleTest() {
 		TestTable table = ConcurrentCache.getInstance().get(new TableIdCache(1)).get();
 		TestTable table2 = ConcurrentCache.getInstance().get(new TableIdCache(1)).get();
 
@@ -46,12 +48,12 @@ public class ConcurrentCacheTest {
 
 	@Test
 	public void multiTableGetTest() {
-		TableAndName tableAndName = ConcurrentCache.getInstance().get(new TableAndNameCache(1)).get();
+		TableAndNameVO tableAndName = ConcurrentCache.getInstance().get(new TableAndNameCache(1)).get();
 		Assert.assertNotNull(tableAndName.getName());
 	}
 
 	@Test
-	public void collTest() {
+	public void listTest() {
 		TableValueCache desc = new TableValueCache(1);
 		ListReference<TestTable> list = ConcurrentCache.getInstance().get(desc);
 		Assert.assertTrue(list.get().size() > 0);
@@ -72,8 +74,8 @@ public class ConcurrentCacheTest {
 	}
 
 	@Test
-	public void multiThreadTest() throws InterruptedException, BrokenBarrierException {
-		int num = 5;
+	public void multiTest() throws InterruptedException, BrokenBarrierException {
+		int num = 2;
 		CyclicBarrier barrier = new CyclicBarrier(num + 1);
 		for (int i = 0; i < num; i++) {
 			new Thread(new addThread(barrier)).start();
@@ -83,6 +85,7 @@ public class ConcurrentCacheTest {
 		barrier.await();
 		long end = System.nanoTime();
 
+		// TODO 为什么不写入db就挂了？
 		ConcurrentCache.getInstance().stop();
 
 		SingleReference<TestTable> singleValue = ConcurrentCache.getInstance().get(new TableIdCache(1));
@@ -102,10 +105,10 @@ public class ConcurrentCacheTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 10000; i++) {
+				for (int i = 0; i < 20000; i++) {
 					SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(1));
-
 					reference.get().increaseValue();
+					reference.saveOrUpdate(reference.get());
 					// 为增加并发异常，暂停100ms
 					// Thread.sleep(10);
 				}
@@ -122,14 +125,13 @@ public class ConcurrentCacheTest {
 
 		new Thread(new concurrentThread(), "update thread").start();
 		System.out.println(ConcurrentCache.getInstance().contains(new TableIdCache(1)));
-		;
 	}
 
 	public class concurrentThread implements Runnable {
 		@Override
 		public void run() {
 			TestTable table = ConcurrentCache.getInstance().get(new TableIdCache(1)).get();
-			ConcurrentCache.getInstance().changeDbState(table, DBState.U, false);
+			ConcurrentCache.getInstance().changeDbState(table, DBState.U);
 		}
 	}
 }

@@ -34,6 +34,7 @@
 		<aspectj.version>1.6.12</aspectj.version>
 		<deepcopy.version>1.5</deepcopy.version>
 		<kryo.version>2.16</kryo.version>
+		<deepcopy.version>1.5</deepcopy.version>
 		<!-- 数据库 -->
 		<h2database.version>1.2.135</h2database.version>
 		<hibernate.version>3.3.1.ga</hibernate.version><!-- 3.3.1.ga,4.1.0.Final -->
@@ -363,6 +364,11 @@
 				<groupId>redis.clients</groupId>
 				<artifactId>jedis</artifactId>
 				<version>${jedis.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.genericdeepcopy</groupId>
+				<artifactId>deepcopy</artifactId>
+				<version>${deepcopy.version}</version>
 			</dependency>
 
 			<!-- 数据库 -->

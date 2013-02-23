@@ -1,6 +1,5 @@
-package com.cm4j.test.guava.consist.value;
+package com.cm4j.test.guava.consist;
 
-import com.cm4j.test.guava.consist.DBState;
 
 /**
  * 原生value接口，可设置任何对象为缓存，子类可对缓存对象进一步封装，{@link DBState}状态需要自己维护<br>
@@ -10,7 +9,7 @@ import com.cm4j.test.guava.consist.DBState;
  * @since 2013-1-18 上午09:30:17
  * 
  */
-public interface IValue {
+public interface IReference {
 
 	/**
 	 * 获取值

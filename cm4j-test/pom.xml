@@ -46,6 +46,11 @@
 			<artifactId>netty</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>com.genericdeepcopy</groupId>
+			<artifactId>deepcopy</artifactId>
+		</dependency>
+
 		<!-- test -->
 		<dependency>
 			<groupId>junit</groupId>
@@ -77,7 +82,7 @@
 			<type>pom</type>
 			<scope>compile</scope>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>

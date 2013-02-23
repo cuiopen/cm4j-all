@@ -17,15 +17,14 @@ import org.jboss.netty.handler.timeout.ReadTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ajexperience.utils.DeepCopyException;
+import com.ajexperience.utils.DeepCopyUtil;
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
-import com.cm4j.test.guava.consist.value.IValue;
-import com.cm4j.test.guava.consist.value.ListReference;
-import com.cm4j.test.guava.consist.value.SingleReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractSequentialIterator;
 
@@ -46,7 +45,7 @@ import com.google.common.collect.AbstractSequentialIterator;
  * @since 2013-1-30 上午11:25:47
  * 
  * @param <String>
- * @param <IValue>
+ * @param <IReference>
  */
 public class ConcurrentCache {
 
@@ -63,16 +62,22 @@ public class ConcurrentCache {
 	static final int MAXIMUM_CAPACITY = 1 << 30;
 	static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
 	static final int RETRIES_BEFORE_LOCK = 2;
+	/** 更新队列检测间隔，单位s */
+	static final int UPDATE_QUEUE_CHECK_INTERVAL = 60;
+	/** 达到多少个对象，可持久化 */
+	static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
+	/** 间隔多少次检查，可持久化 */
+	static final int PERSIST_CHECK_INTERVAL = 5;
 
 	/* ---------------- Fields -------------- */
-	final CacheLoader<String, IValue> loader;
+	final CacheLoader<String, IReference> loader;
 	final int segmentMask;
 	final int segmentShift;
 	final Segment[] segments;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
 	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(30);
 
-	private final ConcurrentLinkedQueue<CacheEntryWrapper> updateQueue;
+	private final ConcurrentLinkedQueue<CacheEntryInUpdateQueue> updateQueue;
 	private final ScheduledExecutorService service;
 	private final Runnable consumeRunnable;
 	private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -92,11 +97,10 @@ public class ConcurrentCache {
 	}
 
 	/* ---------------- Inner Classes -------------- */
-
-	static class HashEntry implements ReferenceEntry {
+	private static class HashEntry implements ReferenceEntry {
 		final String key;
 		final int hash;
-		volatile IValue value;
+		volatile IReference value;
 		final HashEntry next;
 
 		@Override
@@ -105,7 +109,7 @@ public class ConcurrentCache {
 		}
 
 		@Override
-		public IValue getValue() {
+		public IReference getValue() {
 			return value;
 		}
 
@@ -119,7 +123,7 @@ public class ConcurrentCache {
 			return next;
 		}
 
-		HashEntry(String key, int hash, HashEntry next, IValue value) {
+		HashEntry(String key, int hash, HashEntry next, IReference value) {
 			this.key = key;
 			this.hash = hash;
 			this.next = next;
@@ -168,12 +172,9 @@ public class ConcurrentCache {
 	}
 
 	static final class Segment extends ReentrantLock implements Serializable {
-
 		private static final long serialVersionUID = 2249069246763182397L;
-
 		// 作为位操作的mask，必须是(2^n)-1
 		static final int DRAIN_THRESHOLD = 0x3F;
-
 		final ConcurrentCache map;
 
 		transient volatile int count;
@@ -215,7 +216,7 @@ public class ConcurrentCache {
 			return null;
 		}
 
-		IValue getLiveValue(String key, int hash, long now) {
+		IReference getLiveValue(String key, int hash, long now) {
 			HashEntry e = getLiveEntry(key, hash, now);
 			if (e != null) {
 				return e.getValue();
@@ -238,13 +239,13 @@ public class ConcurrentCache {
 			return e;
 		}
 
-		IValue get(String key, int hash, CacheLoader<String, IValue> loader, boolean isLoad) {
+		IReference get(String key, int hash, CacheLoader<String, IReference> loader, boolean isLoad) {
 			try {
 				if (count != 0) { // read-volatile
 					HashEntry e = getEntry(key, hash);
 					if (e != null) {
 						// 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
-						IValue value = getLiveValue(key, hash, now());
+						IReference value = getLiveValue(key, hash, now());
 						if (value != null) {
 							recordAccess(e);
 							return value;
@@ -261,12 +262,12 @@ public class ConcurrentCache {
 			return null;
 		}
 
-		IValue lockedGetOrLoad(String key, int hash, CacheLoader<String, IValue> loader) {
+		IReference lockedGetOrLoad(String key, int hash, CacheLoader<String, IReference> loader) {
 			lock();
 			try {
 				// 有锁情况下重读entry的值
 				// recheck,防止2个线程同时load，都从db获取数据，导致加载了2份数据
-				IValue value = getLiveValue(key, hash, now());
+				IReference value = getLiveValue(key, hash, now());
 				if (value == null) {
 					value = loader.load(key);
 				}
@@ -295,7 +296,7 @@ public class ConcurrentCache {
 			return false;
 		}
 
-		IValue put(String key, int hash, IValue value, boolean onlyIfAbsent) {
+		IReference put(String key, int hash, IReference value, boolean onlyIfAbsent) {
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -311,7 +312,7 @@ public class ConcurrentCache {
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				IValue oldValue;
+				IReference oldValue;
 				if (e != null) {
 					oldValue = e.value;
 					if (!onlyIfAbsent) {
@@ -388,7 +389,7 @@ public class ConcurrentCache {
 		/**
 		 * Remove; match on key only if value null, else match both.
 		 */
-		IValue remove(String key, int hash, IValue value) {
+		IReference remove(String key, int hash, IReference value) {
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -401,9 +402,9 @@ public class ConcurrentCache {
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				IValue oldValue = null;
+				IReference oldValue = null;
 				if (e != null) {
-					IValue v = e.value;
+					IReference v = e.value;
 					if (value == null || value.equals(v)) {
 						oldValue = v;
 						// All entries following removed node can stay
@@ -570,12 +571,12 @@ public class ConcurrentCache {
 
 	/* ---------------- Public operations -------------- */
 
-	public ConcurrentCache(CacheLoader<String, IValue> loader) {
+	public ConcurrentCache(CacheLoader<String, IReference> loader) {
 		this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, DEFAULT_CONCURRENCY_LEVEL, loader);
 	}
 
 	public ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel,
-			CacheLoader<String, IValue> loader) {
+			CacheLoader<String, IReference> loader) {
 		if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null)
 			throw new IllegalArgumentException();
 
@@ -609,7 +610,7 @@ public class ConcurrentCache {
 		}
 
 		// 更新队列
-		updateQueue = new ConcurrentLinkedQueue<CacheEntryWrapper>();
+		updateQueue = new ConcurrentLinkedQueue<CacheEntryInUpdateQueue>();
 
 		// 更新队列处理线程
 		consumeRunnable = new Runnable() {
@@ -621,7 +622,7 @@ public class ConcurrentCache {
 
 		// 定时处理器
 		service = Executors.newScheduledThreadPool(1);
-		service.scheduleAtFixedRate(consumeRunnable, 1, 50, TimeUnit.SECONDS);
+		service.scheduleAtFixedRate(consumeRunnable, 1, UPDATE_QUEUE_CHECK_INTERVAL, TimeUnit.SECONDS);
 	}
 
 	public int size() {
@@ -666,13 +667,13 @@ public class ConcurrentCache {
 			return (int) sum;
 	}
 
-	public IValue get(String key) {
+	public IReference get(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, true);
 	}
 
 	@SuppressWarnings("unchecked")
-	public <V extends IValue> V get(CacheDescriptor<V> desc) {
+	public <V extends IReference> V get(CacheDescriptor<V> desc) {
 		return (V) get(desc.getKey());
 	}
 
@@ -682,26 +683,26 @@ public class ConcurrentCache {
 	 * @param key
 	 * @return
 	 */
-	public IValue getIfPresent(String key) {
+	public IReference getIfPresent(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).get(key, hash, loader, false);
 	}
 
-	public IValue put(String key, IValue value) {
+	public IReference put(String key, IReference value) {
 		if (value == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).put(key, hash, value, false);
 	}
 
-	public void put(CacheDescriptor<? extends IValue> desc, IValue value) {
+	public void put(CacheDescriptor<? extends IReference> desc, IReference value) {
 		put(desc.getKey(), value);
 	}
 
 	/**
 	 * 不存在时放入缓存
 	 */
-	public IValue putIfAbsent(String key, IValue value) {
+	public IReference putIfAbsent(String key, IReference value) {
 		if (value == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
@@ -714,7 +715,7 @@ public class ConcurrentCache {
 	 * @param <V>
 	 * @param desc
 	 */
-	public void persistAndRemove(CacheDescriptor<? extends IValue> desc) {
+	public void persistAndRemove(CacheDescriptor<? extends IReference> desc) {
 		if (contains(desc)) {
 			String key = desc.getKey();
 			final int hash = rehash(key.hashCode());
@@ -727,7 +728,11 @@ public class ConcurrentCache {
 						if (e.value instanceof SingleReference) {
 							CacheEntry entry = ((SingleReference) e.value).get();
 							IEntity entity = entry.parseEntity();
-							hibernate.saveOrUpdate(entity);
+							if (DBState.U == entry.getDbState()) {
+								hibernate.saveOrUpdate(entity);
+							} else if (DBState.D == entry.getDbState()) {
+								hibernate.delete(entity);
+							}
 							entry.setDbState(DBState.P);
 							// 占位：发送到更新队列，状态P
 							sendToUpdateQueue(entry);
@@ -736,7 +741,11 @@ public class ConcurrentCache {
 							for (CacheEntry entry : list) {
 								if (DBState.P != entry.getDbState()) {
 									IEntity entity = entry.parseEntity();
-									hibernate.saveOrUpdate(entity);
+									if (DBState.U == entry.getDbState()) {
+										hibernate.saveOrUpdate(entity);
+									} else if (DBState.D == entry.getDbState()) {
+										hibernate.delete(entity);
+									}
 									entry.setDbState(DBState.P);
 									// 占位：发送到更新队列，状态P
 									sendToUpdateQueue(entry);
@@ -753,7 +762,7 @@ public class ConcurrentCache {
 		}
 	}
 
-	public boolean replace(String key, final IValue oldValue, final IValue newValue) {
+	public boolean replace(String key, final IReference oldValue, final IReference newValue) {
 		if (oldValue == null || newValue == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
@@ -770,19 +779,19 @@ public class ConcurrentCache {
 		});
 	}
 
-	public IValue remove(String key) {
+	public IReference remove(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).remove(key, hash, null);
 	}
 
-	public boolean remove(String key, IValue value) {
+	public boolean remove(String key, IReference value) {
 		int hash = rehash(key.hashCode());
 		if (value == null)
 			return false;
 		return segmentFor(hash).remove(key, hash, value) != null;
 	}
 
-	public void remove(CacheDescriptor<? extends IValue> desc) {
+	public void remove(CacheDescriptor<? extends IReference> desc) {
 		remove(desc.getKey());
 	}
 
@@ -796,7 +805,7 @@ public class ConcurrentCache {
 		return segmentFor(hash).containsKey(key, hash);
 	}
 
-	public boolean contains(CacheDescriptor<? extends IValue> cacheDesc) {
+	public boolean contains(CacheDescriptor<? extends IReference> cacheDesc) {
 		return containsKey(cacheDesc.getKey());
 	}
 
@@ -827,10 +836,10 @@ public class ConcurrentCache {
 	 * @param placeholderPersistCacheEntry
 	 *            将P状态CacheEntry也发送到队列占位
 	 */
-	public void changeDbState(final CacheEntry entry, final DBState dbState, final boolean placeholderPersistCacheEntry) {
+	void changeDbState(final CacheEntry entry, final DBState dbState) {
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
 		Preconditions.checkNotNull(dbState, "DbState不允许为null");
-		Preconditions.checkNotNull(placeholderPersistCacheEntry || DBState.P != dbState, "DbState不允许为持久化");
+		Preconditions.checkState(DBState.P != dbState, "DbState不允许为持久化");
 
 		final String key = entry.getAttachedKey();
 		int hash = rehash(key.hashCode());
@@ -841,7 +850,7 @@ public class ConcurrentCache {
 					// 更改CacheEntry的状态
 					if (e.value instanceof SingleReference) {
 						entry.setDbState(dbState);
-						if (placeholderPersistCacheEntry || DBState.P != dbState) {
+						if (DBState.P != dbState) {
 							sendToUpdateQueue(entry);
 						}
 						return null;
@@ -851,7 +860,7 @@ public class ConcurrentCache {
 						for (CacheEntry cacheEntry : allObjects) {
 							if (cacheEntry == entry) {
 								cacheEntry.setDbState(dbState);
-								if (placeholderPersistCacheEntry || DBState.P != dbState) {
+								if (DBState.P != dbState) {
 									sendToUpdateQueue(entry);
 								}
 								return null;
@@ -893,7 +902,7 @@ public class ConcurrentCache {
 
 		String getKey();
 
-		IValue getValue();
+		IReference getValue();
 
 		int getHash();
 
@@ -940,7 +949,7 @@ public class ConcurrentCache {
 		}
 
 		@Override
-		public IValue getValue() {
+		public IReference getValue() {
 			return null;
 		}
 
@@ -997,7 +1006,7 @@ public class ConcurrentCache {
 			}
 
 			@Override
-			public IValue getValue() {
+			public IReference getValue() {
 				return null;
 			}
 
@@ -1157,7 +1166,7 @@ public class ConcurrentCache {
 	 */
 	private void sendToUpdateQueue(CacheEntry entry) {
 		entry.getNumInUpdateQueue().incrementAndGet();
-		updateQueue.add(new CacheEntryWrapper(entry));
+		updateQueue.add(new CacheEntryInUpdateQueue(entry));
 	}
 
 	public void stop() {
@@ -1172,49 +1181,77 @@ public class ConcurrentCache {
 	}
 
 	/**
+	 * 更新队列消费计数器
+	 */
+	private long counter = 0L;
+
+	/**
 	 * 将更新队列发送给db存储<br>
 	 * 
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void consumeUpdateQueue() {
 		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
-		CacheEntryWrapper wrapper = null;
-		while ((wrapper = updateQueue.poll()) != null) {
-			CacheEntry entry = wrapper.getEntry();
-			int num = entry.getNumInUpdateQueue().decrementAndGet();
-			// 删除或者更新的num为0
-			// 注意：这里要使用CacheEntryWrapper#DbState，而不要用CacheEntry的DbState
-			if (num == 0) {
-				IEntity entity = entry.parseEntity();
-				if (entity != null && wrapper.getDbState() != DBState.P) {
-					// TODO 发送db去批处理
-					System.out.println(entry.getDbState() + " " + entity.toString());
+		if (updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
+			CacheEntryInUpdateQueue wrapper = null;
+			while ((wrapper = updateQueue.poll()) != null) {
+				CacheEntry reference = wrapper.getReference();
+				int num = reference.getNumInUpdateQueue().decrementAndGet();
+				// 删除或者更新的num为0
+				if (num == 0) {
+					// TODO 此时对象更改了怎么办？下面把他设成P，然后被删除了？
+					IEntity entity = wrapper.getCopied().parseEntity();
+					if (entity != null && DBState.P != wrapper.getCopied().getDbState()) {
+						// TODO 发送db去批处理
+						logger.debug(reference.getDbState() + " " + entity.toString());
 
-					HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-					hibernate.saveOrUpdate(entity);
+						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+						if (DBState.U == wrapper.getCopied().getDbState()) {
+							hibernate.saveOrUpdate(entity);
+						} else if (DBState.D == wrapper.getCopied().getDbState()) {
+							hibernate.delete(entity);
+						}
 
-					changeDbState(entry, DBState.P, true);
+						// TODO，需测试
+						// recheck,有可能又有其他线程更新了对象，此时也不能重置为P
+						if (DBState.P != wrapper.getCopied().getDbState()) {
+							changeDbState(reference, DBState.P);
+						}
+					}
 				}
 			}
 		}
 	}
 
-	private static class CacheEntryWrapper {
-		private CacheEntry entry;
-		private DBState dbState;
+	/**
+	 * 读取计数器:引用原对象<br>
+	 * 读取写入对象：本类中dbState<br>
+	 * 写入数据：本类中copied
+	 */
+	private static final class CacheEntryInUpdateQueue {
+		private final CacheEntry reference, copied;
 
-		private CacheEntryWrapper(CacheEntry entry) {
-			this.entry = entry;
-			// new一个CacheEntryWrapper来保存每个entry的dbState
-			this.dbState = entry.getDbState();
+		private CacheEntryInUpdateQueue(CacheEntry reference) {
+			this.reference = reference;
+			try {
+				this.copied = new DeepCopyUtil().deepCopy(reference);
+			} catch (DeepCopyException e) {
+				throw new RuntimeException("CacheEntry[" + reference.getAttachedKey() + "]不能被deepCopy", e);
+			}
 		}
 
-		public CacheEntry getEntry() {
-			return entry;
+		/**
+		 * 引用原对象
+		 */
+		public CacheEntry getReference() {
+			return reference;
 		}
 
-		public DBState getDbState() {
-			return dbState;
+		/**
+		 * 拷贝对象，用于读取数据
+		 */
+		public CacheEntry getCopied() {
+			return copied;
 		}
 	}
 }

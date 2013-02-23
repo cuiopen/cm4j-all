@@ -1,14 +1,9 @@
 package com.cm4j.test.guava.consist.entity;
 
-// Generated 2013-1-19 16:21:24 by Hibernate Tools 3.2.4.GA
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.cm4j.test.guava.consist.CacheEntry;
 
@@ -60,13 +55,11 @@ public class TestTable extends CacheEntry implements IEntity {
 		return this;
 	}
 
-	private final Logger logger = LoggerFactory.getLogger(getClass());
-
 	public synchronized void increaseValue() {
 		this.NValue++;
 		// 一般情况下是需要对NValue都要加锁
 		// 但这里，也在synchronized锁下，所以getNValue()方法显示也正常
-		logger.debug("" + this);
+		System.out.println(this);
 	}
 
 	@Override
