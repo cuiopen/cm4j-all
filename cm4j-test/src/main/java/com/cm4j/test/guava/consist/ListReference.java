@@ -35,7 +35,7 @@ public class ListReference<E extends CacheEntry> implements IReference {
 
 	/**
 	 * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
-	 * {@link #saveOrUpdate(CacheEntry)}
+	 * {@link #update(CacheEntry)}
 	 * 
 	 * @return
 	 */
@@ -63,7 +63,7 @@ public class ListReference<E extends CacheEntry> implements IReference {
 	 * 
 	 * @param e
 	 */
-	public void saveOrUpdate(E e) {
+	public void update(E e) {
 		if (!all_objects.contains(e)) {
 			e.setAttachedKey(attachedKey);
 			all_objects.add(e);

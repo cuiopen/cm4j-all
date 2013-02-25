@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.caches;
+package com.cm4j.test.guava.consist.usage.caches;
 
 import java.util.List;
 

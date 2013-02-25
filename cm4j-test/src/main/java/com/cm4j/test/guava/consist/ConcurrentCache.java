@@ -829,12 +829,55 @@ public class ConcurrentCache {
 	}
 
 	/**
+	 * 在entry.getNumInUpdateQueue().get() == 0时调用
+	 * 
+	 * @param entry
+	 * @return 是否成功修改
+	 */
+	boolean changeDbStatePersist(final CacheEntry entry) {
+		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
+
+		final String key = entry.getAttachedKey();
+		int hash = rehash(key.hashCode());
+		return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
+			@Override
+			public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
+				if (e != null && e.value != null && !isExpired(e, now())) {
+					// recheck，不等于0代表有其他线程修改了，所以不能改为P状态
+					if (entry.getNumInUpdateQueue().get() != 0) {
+						return false;
+					}
+					// 更改CacheEntry的状态
+					if (e.value instanceof SingleReference) {
+						entry.setDbState(DBState.P);
+						sendToUpdateQueue(entry);
+						return true;
+					} else if (e.value instanceof ListReference) {
+						@SuppressWarnings("unchecked")
+						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value).get();
+						for (CacheEntry cacheEntry : allObjects) {
+							if (cacheEntry == entry) {
+								cacheEntry.setDbState(DBState.P);
+								sendToUpdateQueue(entry);
+								return true;
+							}
+						}
+					} else {
+						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
+					}
+				}
+				// 不存在或过期
+				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
+			}
+		});
+	}
+
+	/**
 	 * 更改db状态并发送到更新队列，缓存不应直接调用此方法
 	 * 
 	 * @param entry
 	 * @param dbState
-	 * @param placeholderPersistCacheEntry
-	 *            将P状态CacheEntry也发送到队列占位
+	 *            U or D,不允许P
 	 */
 	void changeDbState(final CacheEntry entry, final DBState dbState) {
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
@@ -850,9 +893,7 @@ public class ConcurrentCache {
 					// 更改CacheEntry的状态
 					if (e.value instanceof SingleReference) {
 						entry.setDbState(dbState);
-						if (DBState.P != dbState) {
-							sendToUpdateQueue(entry);
-						}
+						sendToUpdateQueue(entry);
 						return null;
 					} else if (e.value instanceof ListReference) {
 						@SuppressWarnings("unchecked")
@@ -860,9 +901,7 @@ public class ConcurrentCache {
 						for (CacheEntry cacheEntry : allObjects) {
 							if (cacheEntry == entry) {
 								cacheEntry.setDbState(dbState);
-								if (DBState.P != dbState) {
-									sendToUpdateQueue(entry);
-								}
+								sendToUpdateQueue(entry);
 								return null;
 							}
 						}
@@ -1214,9 +1253,7 @@ public class ConcurrentCache {
 
 						// TODO，需测试
 						// recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-						if (DBState.P != wrapper.getCopied().getDbState()) {
-							changeDbState(reference, DBState.P);
-						}
+						changeDbStatePersist(wrapper.getReference());
 					}
 				}
 			}

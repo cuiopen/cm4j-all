@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.usage;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
@@ -9,11 +9,15 @@ import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.cm4j.test.guava.consist.caches.TableAndNameCache;
-import com.cm4j.test.guava.consist.caches.TableAndNameVO;
-import com.cm4j.test.guava.consist.caches.TableIdCache;
-import com.cm4j.test.guava.consist.caches.TableValueCache;
+import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.DBState;
+import com.cm4j.test.guava.consist.ListReference;
+import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
+import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
+import com.cm4j.test.guava.consist.usage.caches.TableAndNameVO;
+import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
+import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
 
 /**
  * 1.缓存过期了不应该能修改状态? 使用引用队列？<br>
@@ -37,7 +41,7 @@ public class ConcurrentCacheTest {
 		TestTable test = new TestTable(6, (long) 6);
 		TableIdCache desc = new TableIdCache(3);
 		SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(desc);
-		reference.saveOrUpdate(test);
+		reference.update(test);
 
 		TestTable testTable = ConcurrentCache.getInstance().get(desc).get();
 		Assert.assertTrue(testTable == test);
@@ -68,9 +72,9 @@ public class ConcurrentCacheTest {
 		TableValueCache desc2 = new TableValueCache(1);
 		ListReference<TestTable> list2 = ConcurrentCache.getInstance().get(desc2);
 		TestTable table = new TestTable(4, (long) 6);
-		list2.saveOrUpdate(table);
+		list2.update(table);
 		list2.delete(table);
-		list2.saveOrUpdate(table);
+		list2.update(table);
 	}
 
 	@Test
@@ -108,7 +112,7 @@ public class ConcurrentCacheTest {
 				for (int i = 0; i < 20000; i++) {
 					SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(1));
 					reference.get().increaseValue();
-					reference.saveOrUpdate(reference.get());
+					reference.update(reference.get());
 					// 为增加并发异常，暂停100ms
 					// Thread.sleep(10);
 				}
@@ -130,8 +134,8 @@ public class ConcurrentCacheTest {
 	public class concurrentThread implements Runnable {
 		@Override
 		public void run() {
-			TestTable table = ConcurrentCache.getInstance().get(new TableIdCache(1)).get();
-			ConcurrentCache.getInstance().changeDbState(table, DBState.U);
+			SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(1));
+			reference.update(reference.get());
 		}
 	}
 }

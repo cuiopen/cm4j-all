@@ -1,9 +1,9 @@
 package com.cm4j.test.guava.consist.loader;
 
 import com.cm4j.test.guava.consist.IReference;
-import com.cm4j.test.guava.consist.caches.TableAndNameCache;
-import com.cm4j.test.guava.consist.caches.TableIdCache;
-import com.cm4j.test.guava.consist.caches.TableValueCache;
+import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
+import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
+import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
 
 /**
  * 缓存前缀与描述的映射

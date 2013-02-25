@@ -46,7 +46,7 @@ public class SingleReference<V extends CacheEntry> implements IReference {
 	 * 
 	 * @param v
 	 */
-	public void saveOrUpdate(V v) {
+	public void update(V v) {
 		v.setAttachedKey(attachedKey);
 		this.v = v;
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
