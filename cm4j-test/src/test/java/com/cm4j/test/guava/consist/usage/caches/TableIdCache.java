@@ -9,8 +9,11 @@ import com.google.common.base.Preconditions;
 
 public class TableIdCache extends CacheDescriptor<SingleReference<TestTable>> {
 
-	public TableIdCache(Object... params) {
-		super(params);
+	public TableIdCache() {
+	}
+
+	public TableIdCache(int id) {
+		super(id);
 	}
 
 	@Override

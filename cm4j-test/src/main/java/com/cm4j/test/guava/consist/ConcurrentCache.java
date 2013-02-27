@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
@@ -79,7 +80,6 @@ public class ConcurrentCache {
 
 	private final ConcurrentLinkedQueue<CacheEntryInUpdateQueue> updateQueue;
 	private final ScheduledExecutorService service;
-	private final Runnable consumeRunnable;
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	/* ---------------- Small Utilities -------------- */
@@ -183,14 +183,13 @@ public class ConcurrentCache {
 		transient volatile AtomicReferenceArray<HashEntry> table;
 		final float loadFactor;
 
-		final AccessQueue accessQueue;
+		final AccessQueue accessQueue = new AccessQueue();
 		final AtomicInteger readCount = new AtomicInteger();
 
 		Segment(ConcurrentCache map, int initialCapacity, float lf) {
 			this.map = map;
 			loadFactor = lf;
 			setTable(HashEntry.newArray(initialCapacity));
-			accessQueue = new AccessQueue();
 		}
 
 		static final Segment[] newArray(int i) {
@@ -418,7 +417,6 @@ public class ConcurrentCache {
 
 						// 从队列移除
 						accessQueue.remove(e);
-
 						count = c; // write-volatile
 					}
 				}
@@ -612,17 +610,14 @@ public class ConcurrentCache {
 		// 更新队列
 		updateQueue = new ConcurrentLinkedQueue<CacheEntryInUpdateQueue>();
 
-		// 更新队列处理线程
-		consumeRunnable = new Runnable() {
-			@Override
-			public void run() {
-				consumeUpdateQueue();
-			}
-		};
-
 		// 定时处理器
 		service = Executors.newScheduledThreadPool(1);
-		service.scheduleAtFixedRate(consumeRunnable, 1, UPDATE_QUEUE_CHECK_INTERVAL, TimeUnit.SECONDS);
+		service.scheduleAtFixedRate(new Runnable() {
+			@Override
+			public void run() {
+				consumeUpdateQueue(false);
+			}
+		}, 1, UPDATE_QUEUE_CHECK_INTERVAL, TimeUnit.SECONDS);
 	}
 
 	public int size() {
@@ -667,14 +662,11 @@ public class ConcurrentCache {
 			return (int) sum;
 	}
 
-	public IReference get(String key) {
-		int hash = rehash(key.hashCode());
-		return segmentFor(hash).get(key, hash, loader, true);
-	}
-
 	@SuppressWarnings("unchecked")
 	public <V extends IReference> V get(CacheDescriptor<V> desc) {
-		return (V) get(desc.getKey());
+		String key = desc.getKey();
+		int hash = rehash(key.hashCode());
+		return (V) segmentFor(hash).get(key, hash, loader, true);
 	}
 
 	/**
@@ -683,30 +675,34 @@ public class ConcurrentCache {
 	 * @param key
 	 * @return
 	 */
-	public IReference getIfPresent(String key) {
+	@SuppressWarnings("unchecked")
+	public <V extends IReference> V getIfPresent(CacheDescriptor<V> desc) {
+		String key = desc.getKey();
 		int hash = rehash(key.hashCode());
-		return segmentFor(hash).get(key, hash, loader, false);
+		return (V) segmentFor(hash).get(key, hash, loader, false);
 	}
 
-	public IReference put(String key, IReference value) {
-		if (value == null)
-			throw new NullPointerException();
-		int hash = rehash(key.hashCode());
-		return segmentFor(hash).put(key, hash, value, false);
-	}
+	@SuppressWarnings("unchecked")
+	public <V extends IReference> V put(CacheDescriptor<V> desc, IReference value) {
+		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
+		Preconditions.checkNotNull(value);
 
-	public void put(CacheDescriptor<? extends IReference> desc, IReference value) {
-		put(desc.getKey(), value);
+		String key = desc.getKey();
+		int hash = rehash(key.hashCode());
+		return (V) segmentFor(hash).put(key, hash, value, false);
 	}
 
 	/**
 	 * 不存在时放入缓存
 	 */
-	public IReference putIfAbsent(String key, IReference value) {
-		if (value == null)
-			throw new NullPointerException();
+	@SuppressWarnings("unchecked")
+	public <V extends IReference> V putIfAbsent(CacheDescriptor<V> desc, IReference value) {
+		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
+		Preconditions.checkNotNull(value);
+
+		String key = desc.getKey();
 		int hash = rehash(key.hashCode());
-		return segmentFor(hash).put(key, hash, value, true);
+		return (V) segmentFor(hash).put(key, hash, value, true);
 	}
 
 	/**
@@ -716,50 +712,50 @@ public class ConcurrentCache {
 	 * @param desc
 	 */
 	public void persistAndRemove(CacheDescriptor<? extends IReference> desc) {
-		if (contains(desc)) {
-			String key = desc.getKey();
-			final int hash = rehash(key.hashCode());
-			segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
-				@SuppressWarnings({ "rawtypes", "unchecked" })
-				@Override
-				public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-					if (e != null && e.value != null && !e.value.isAllPersist()) {
-						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-						if (e.value instanceof SingleReference) {
-							CacheEntry entry = ((SingleReference) e.value).get();
-							IEntity entity = entry.parseEntity();
-							if (DBState.U == entry.getDbState()) {
-								hibernate.saveOrUpdate(entity);
-							} else if (DBState.D == entry.getDbState()) {
-								hibernate.delete(entity);
-							}
-							entry.setDbState(DBState.P);
-							// 占位：发送到更新队列，状态P
-							sendToUpdateQueue(entry);
-						} else if (e.value instanceof ListReference) {
-							List<? extends CacheEntry> list = ((ListReference<? extends CacheEntry>) e.value).get();
-							for (CacheEntry entry : list) {
-								if (DBState.P != entry.getDbState()) {
-									IEntity entity = entry.parseEntity();
-									if (DBState.U == entry.getDbState()) {
-										hibernate.saveOrUpdate(entity);
-									} else if (DBState.D == entry.getDbState()) {
-										hibernate.delete(entity);
-									}
-									entry.setDbState(DBState.P);
-									// 占位：发送到更新队列，状态P
-									sendToUpdateQueue(entry);
-								}
-							}
-						} else {
-							throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
+		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
+
+		String key = desc.getKey();
+		final int hash = rehash(key.hashCode());
+		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			@Override
+			public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
+				if (e != null && e.value != null && !e.value.isAllPersist()) {
+					HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+					if (e.value instanceof SingleReference) {
+						CacheEntry entry = ((SingleReference) e.value).get();
+						IEntity entity = entry.parseEntity();
+						if (DBState.U == entry.getDbState()) {
+							hibernate.saveOrUpdate(entity);
+						} else if (DBState.D == entry.getDbState()) {
+							hibernate.delete(entity);
 						}
-						segment.removeEntry(e, hash);
+						entry.setDbState(DBState.P);
+						// 占位：发送到更新队列，状态P
+						sendToUpdateQueue(entry);
+					} else if (e.value instanceof ListReference) {
+						List<? extends CacheEntry> list = ((ListReference<? extends CacheEntry>) e.value).get();
+						for (CacheEntry entry : list) {
+							if (DBState.P != entry.getDbState()) {
+								IEntity entity = entry.parseEntity();
+								if (DBState.U == entry.getDbState()) {
+									hibernate.saveOrUpdate(entity);
+								} else if (DBState.D == entry.getDbState()) {
+									hibernate.delete(entity);
+								}
+								entry.setDbState(DBState.P);
+								// 占位：发送到更新队列，状态P
+								sendToUpdateQueue(entry);
+							}
+						}
+					} else {
+						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
 					}
-					return null;
+					segment.removeEntry(e, hash);
 				}
-			});
-		}
+				return null;
+			}
+		});
 	}
 
 	public boolean replace(String key, final IReference oldValue, final IReference newValue) {
@@ -880,6 +876,8 @@ public class ConcurrentCache {
 	 *            U or D,不允许P
 	 */
 	void changeDbState(final CacheEntry entry, final DBState dbState) {
+		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
+
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
 		Preconditions.checkNotNull(dbState, "DbState不允许为null");
 		Preconditions.checkState(DBState.P != dbState, "DbState不允许为持久化");
@@ -1208,8 +1206,20 @@ public class ConcurrentCache {
 		updateQueue.add(new CacheEntryInUpdateQueue(entry));
 	}
 
+	// 缓存关闭标识
+	private final AtomicBoolean stop = new AtomicBoolean();
+
+	/**
+	 * 关闭并写入db
+	 */
 	public void stop() {
-		Future<?> future = service.submit(consumeRunnable);
+		stop.set(true);
+		Future<?> future = service.submit(new Runnable() {
+			@Override
+			public void run() {
+				consumeUpdateQueue(true);
+			}
+		});
 		try {
 			// 阻塞等待线程完成
 			future.get();
@@ -1227,11 +1237,13 @@ public class ConcurrentCache {
 	/**
 	 * 将更新队列发送给db存储<br>
 	 * 
+	 * @param doNow
+	 *            是否立即写入
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private void consumeUpdateQueue() {
+	private void consumeUpdateQueue(boolean doNow) {
 		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
-		if (updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
+		if (doNow || updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
 			CacheEntryInUpdateQueue wrapper = null;
 			while ((wrapper = updateQueue.poll()) != null) {
 				CacheEntry reference = wrapper.getReference();

@@ -32,12 +32,11 @@ public class SingleReference<V extends CacheEntry> implements IReference {
 	 * @param e
 	 */
 	public void delete() {
-		if (v == null) {
+		if (this.v == null) {
 			throw new RuntimeException("SingleValue中不包含对象，无法删除");
 		}
 		// 注意顺序，先remove再change
-		ConcurrentCache.getInstance().changeDbState(v, DBState.D);
-		// TODO 需要拷贝新对象，以防止对象=null？
+		ConcurrentCache.getInstance().changeDbState(this.v, DBState.D);
 		this.v = null;
 	}
 

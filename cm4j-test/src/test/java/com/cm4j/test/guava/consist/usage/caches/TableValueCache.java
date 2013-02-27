@@ -12,6 +12,13 @@ import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.google.common.base.Preconditions;
 
+/**
+ * 根据Value查询的缓存
+ * 
+ * @author Yang.hao
+ * @since 2013-2-27 下午03:23:03
+ *
+ */
 public class TableValueCache extends CacheDescriptor<ListReference<TestTable>> {
 
 	public TableValueCache(Object... params) {
