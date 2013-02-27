@@ -76,7 +76,7 @@ public class ConcurrentCache {
 	final int segmentShift;
 	final Segment[] segments;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(30);
+	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(300);
 
 	private final ConcurrentLinkedQueue<CacheEntryInUpdateQueue> updateQueue;
 	private final ScheduledExecutorService service;
@@ -825,7 +825,7 @@ public class ConcurrentCache {
 	}
 
 	/**
-	 * 在entry.getNumInUpdateQueue().get() == 0时调用
+	 * 在没有修改的时候，即entry.getNumInUpdateQueue().get() == 0时调用
 	 * 
 	 * @param entry
 	 * @return 是否成功修改
@@ -846,7 +846,6 @@ public class ConcurrentCache {
 					// 更改CacheEntry的状态
 					if (e.value instanceof SingleReference) {
 						entry.setDbState(DBState.P);
-						sendToUpdateQueue(entry);
 						return true;
 					} else if (e.value instanceof ListReference) {
 						@SuppressWarnings("unchecked")
@@ -854,7 +853,6 @@ public class ConcurrentCache {
 						for (CacheEntry cacheEntry : allObjects) {
 							if (cacheEntry == entry) {
 								cacheEntry.setDbState(DBState.P);
-								sendToUpdateQueue(entry);
 								return true;
 							}
 						}

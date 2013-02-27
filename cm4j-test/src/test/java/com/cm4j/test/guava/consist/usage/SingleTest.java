@@ -65,5 +65,19 @@ public class SingleTest {
 		TableAndNameVO tableAndName = ConcurrentCache.getInstance().get(new TableAndNameCache(1)).get();
 		Assert.assertNotNull(tableAndName.getName());
 	}
+	
+	@Test
+	public void persistAndRemove(){
+		// todo
+	}
 
+	@Test
+	public void t(){
+		SingleReference<TestTable> reference = new TableIdCache(5).reference();
+		TestTable testTable = reference.get();
+		testTable.setNValue(1L);
+		reference.update(testTable);
+		testTable.setNValue(2L);
+		reference.update(testTable);
+	}
 }
