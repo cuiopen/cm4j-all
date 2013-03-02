@@ -59,7 +59,7 @@ public class ConcurrentCache {
 	/* ---------------- Constants -------------- */
 	static final int DEFAULT_INITIAL_CAPACITY = 16;
 	static final float DEFAULT_LOAD_FACTOR = 0.75f;
-	static final int DEFAULT_CONCURRENCY_LEVEL = 16;
+	static final int DEFAULT_CONCURRENCY_LEVEL = 1; // TODO 默认设为16
 	static final int MAXIMUM_CAPACITY = 1 << 30;
 	static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
 	static final int RETRIES_BEFORE_LOCK = 2;
@@ -328,7 +328,7 @@ public class ConcurrentCache {
 				}
 
 				// 在put的时候对value设置所属key
-				value.setAttachedKey(key);
+				((AbsReference) value).setAttachedKey(key);
 
 				// 返回旧值
 				return oldValue;
@@ -672,8 +672,7 @@ public class ConcurrentCache {
 	/**
 	 * 存在即获取
 	 * 
-	 * @param key
-	 * @return
+	 * @return 不存在时返回的reference为null
 	 */
 	@SuppressWarnings("unchecked")
 	public <V extends IReference> V getIfPresent(CacheDescriptor<V> desc) {
@@ -708,13 +707,25 @@ public class ConcurrentCache {
 	/**
 	 * 先持久化再移除
 	 * 
-	 * @param <V>
 	 * @param desc
+	 * @param isRemove
+	 *            是否移除
 	 */
-	public void persistAndRemove(CacheDescriptor<? extends IReference> desc) {
+	public void persistAndRemove(CacheDescriptor<? extends IReference> desc, boolean isRemove) {
+		persistAndRemove(desc.getKey(), isRemove);
+	}
+
+	/**
+	 * 持久化
+	 * 
+	 * @param key
+	 * @param isRemove
+	 *            是否移除
+	 */
+	public void persistAndRemove(String key, final boolean isRemove) {
+		Preconditions.checkNotNull(key, "key不能为null");
 		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
-		String key = desc.getKey();
 		final int hash = rehash(key.hashCode());
 		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
 			@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -751,7 +762,9 @@ public class ConcurrentCache {
 					} else {
 						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
 					}
-					segment.removeEntry(e, hash);
+					if (isRemove) {
+						segment.removeEntry(e, hash);
+					}
 				}
 				return null;
 			}
@@ -1249,19 +1262,18 @@ public class ConcurrentCache {
 				// 删除或者更新的num为0
 				if (num == 0) {
 					// TODO 此时对象更改了怎么办？下面把他设成P，然后被删除了？
-					IEntity entity = wrapper.getCopied().parseEntity();
-					if (entity != null && DBState.P != wrapper.getCopied().getDbState()) {
+					IEntity entity = wrapper.getEntity();
+					if (entity != null && DBState.P != wrapper.getDbState()) {
 						// TODO 发送db去批处理
 						logger.debug(reference.getDbState() + " " + entity.toString());
 
 						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-						if (DBState.U == wrapper.getCopied().getDbState()) {
+						if (DBState.U == wrapper.getDbState()) {
 							hibernate.saveOrUpdate(entity);
-						} else if (DBState.D == wrapper.getCopied().getDbState()) {
+						} else if (DBState.D == wrapper.getDbState()) {
 							hibernate.delete(entity);
 						}
 
-						// TODO，需测试
 						// recheck,有可能又有其他线程更新了对象，此时也不能重置为P
 						changeDbStatePersist(wrapper.getReference());
 					}
@@ -1276,14 +1288,25 @@ public class ConcurrentCache {
 	 * 写入数据：本类中copied
 	 */
 	private static final class CacheEntryInUpdateQueue {
-		private final CacheEntry reference, copied;
+		private final CacheEntry reference;
+		private final DBState dbState;
+		private final IEntity entity;
 
 		private CacheEntryInUpdateQueue(CacheEntry reference) {
 			this.reference = reference;
-			try {
-				this.copied = new DeepCopyUtil().deepCopy(reference);
-			} catch (DeepCopyException e) {
-				throw new RuntimeException("CacheEntry[" + reference.getAttachedKey() + "]不能被deepCopy", e);
+			this.dbState = reference.getDbState();
+
+			IEntity entity = reference.parseEntity();
+			if (reference instanceof IEntity && ((IEntity) reference != entity)) {
+				// 内存地址不同，创建了新对象
+				this.entity = entity;
+			} else {
+				// 其他情况，深拷贝
+				try {
+					this.entity = new DeepCopyUtil().deepCopy(reference.parseEntity());
+				} catch (DeepCopyException e) {
+					throw new RuntimeException("CacheEntry[" + reference.getAttachedKey() + "]不能被deepCopy", e);
+				}
 			}
 		}
 
@@ -1295,10 +1318,14 @@ public class ConcurrentCache {
 		}
 
 		/**
-		 * 拷贝对象，用于读取数据
+		 * 数据，是CacheEntry的数据备份
 		 */
-		public CacheEntry getCopied() {
-			return copied;
+		public IEntity getEntity() {
+			return entity;
+		}
+
+		public DBState getDbState() {
+			return dbState;
 		}
 	}
 }

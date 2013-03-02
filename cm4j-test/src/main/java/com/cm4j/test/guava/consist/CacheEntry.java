@@ -5,8 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.cm4j.test.guava.consist.entity.IEntity;
 
 /**
- * 单个缓存值，与list相对应<br>
- * 例如数据库中的一行数据<br>
+ * 单个缓存值，例如数据库中的一行数据<br>
  * 注意：此类会被copy，所以不要包含大对象，如logger，以防止效率降低
  * 
  * @author Yang.hao
@@ -34,9 +33,11 @@ public abstract class CacheEntry {
 	}
 
 	/**
-	 * 根据当前缓存对象解析hibernate entity进行数据保存
+	 * 根据当前缓存对象解析IEntity进行数据保存<br>
 	 * 
-	 * @return
+	 * 注意：当CacheEntry是IEntity的一个接口，如果不是，则深拷贝IEntity<br>
+	 * 1.子类直接返回this，此时会对IEntity直接深拷贝[性能略低，代码简单]<br>
+	 * 2.子类新建IEntity对象，则不会深拷贝，直接用这个new出来的对象[性能稍高，代码臃肿了点]<br>
 	 */
 	public abstract IEntity parseEntity();
 

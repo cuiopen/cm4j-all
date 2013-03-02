@@ -13,18 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @param <E>
  * @param <C>
  */
-public class ListReference<E extends CacheEntry> implements IReference {
+public class ListReference<E extends CacheEntry> extends AbsReference {
 	private final CopyOnWriteArrayList<E> all_objects = new CopyOnWriteArrayList<E>();
 
 	/**
-	 * 此对象所依附的key
-	 */
-	private String attachedKey;
-
-	/**
 	 * 初始化
-	 * 
-	 * @param all_objects
 	 */
 	public ListReference(List<E> all_objects) {
 		if (all_objects == null) {
@@ -36,18 +29,15 @@ public class ListReference<E extends CacheEntry> implements IReference {
 	/**
 	 * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
 	 * {@link #update(CacheEntry)}
-	 * 
-	 * @return
 	 */
 	@SuppressWarnings("unchecked")
+	@Override
 	public List<E> get() {
 		return all_objects;
 	}
 
 	/**
 	 * 删除
-	 * 
-	 * @param e
 	 */
 	public void delete(E e) {
 		if (!all_objects.contains(e)) {
@@ -60,12 +50,10 @@ public class ListReference<E extends CacheEntry> implements IReference {
 
 	/**
 	 * 新增或修改
-	 * 
-	 * @param e
 	 */
 	public void update(E e) {
 		if (!all_objects.contains(e)) {
-			e.setAttachedKey(attachedKey);
+			e.setAttachedKey(getAttachedKey());
 			all_objects.add(e);
 		}
 		ConcurrentCache.getInstance().changeDbState(e, DBState.U);
@@ -81,13 +69,9 @@ public class ListReference<E extends CacheEntry> implements IReference {
 		return true;
 	}
 
-	public String getAttachedKey() {
-		return attachedKey;
-	}
-
 	@Override
 	public void setAttachedKey(String attachedKey) {
-		this.attachedKey = attachedKey;
+		super.setAttachedKey(attachedKey);
 		for (E e : all_objects) {
 			e.setAttachedKey(attachedKey);
 		}

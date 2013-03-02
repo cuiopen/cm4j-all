@@ -48,4 +48,8 @@ public abstract class CacheDescriptor<V extends IReference> {
 	public V reference() {
 		return ConcurrentCache.getInstance().get(this);
 	}
+	
+	public V referenceIfPresent(){
+		return ConcurrentCache.getInstance().getIfPresent(this);
+	}
 }

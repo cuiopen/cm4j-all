@@ -1,6 +1,8 @@
 package com.cm4j.test.guava.consist.loader;
 
 import com.cm4j.test.guava.consist.IReference;
+import com.cm4j.test.guava.consist.usage.caches.FieldFlagCache;
+import com.cm4j.test.guava.consist.usage.caches.FieldFlagCollCache;
 import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
 import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
 import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
@@ -16,7 +18,9 @@ public enum PrefixMappping {
 
 	$1(new TableIdCache()),
 	$2(new TableValueCache()),
-	$3(new TableAndNameCache());
+	$3(new TableAndNameCache()),
+	$4(new FieldFlagCache()),
+	$5(new FieldFlagCollCache());
 
 	private CacheDescriptor<? extends IReference> cacheDesc;
 

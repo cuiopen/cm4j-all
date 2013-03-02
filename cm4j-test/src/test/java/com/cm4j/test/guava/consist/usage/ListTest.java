@@ -46,12 +46,12 @@ public class ListTest {
 		// 不一致代表把新对象加入到此缓存中，这样缓存过期之前是没问题的，但过期后再查询db是有问题的，所以不要这样写
 
 		// 也就是：不要去更改缓存的键里面的值，加入到缓存的值的键要一致
-		TestTable table = new TestTable(4, (long) 6);
+		TestTable table = new TestTable(1, (long) 6);
 		reference.update(table);
 
-		Assert.assertEquals(6L, new TableValueCache(1).findById(4).getNValue().longValue());
+		Assert.assertEquals(6L, new TableValueCache(6).findById(1).getNValue().longValue());
 
 		reference.delete(table);
-		Assert.assertNull(new TableValueCache(1).findById(4));
+		Assert.assertNull(new TableValueCache(1).findById(6));
 	}
 }

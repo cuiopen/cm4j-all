@@ -14,8 +14,6 @@ import com.cm4j.test.guava.consist.usage.caches.TableAndNameVO;
 import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
 
 /**
- * 1.缓存过期了不应该能修改状态? 使用引用队列？<br>
- * 2.单个对象的状态修改？ 不要放到应用中修改，放到SingleValue和ListValue中处理
  * 
  * @author Yang.hao
  * @since 2013-2-15 上午09:45:41
@@ -48,8 +46,7 @@ public class SingleTest {
 		}
 		reference.update(testTable);
 
-		Assert.assertEquals(old + 1, ConcurrentCache.getInstance().get(new TableIdCache(3)).get().getNValue()
-				.longValue());
+		Assert.assertEquals(old + 1, new TableIdCache(3).reference().get().getNValue().longValue());
 	}
 
 	@Test
@@ -65,19 +62,26 @@ public class SingleTest {
 		TableAndNameVO tableAndName = ConcurrentCache.getInstance().get(new TableAndNameCache(1)).get();
 		Assert.assertNotNull(tableAndName.getName());
 	}
-	
-	@Test
-	public void persistAndRemove(){
-		// todo
-	}
 
 	@Test
-	public void t(){
+	public void persistAndRemove() {
 		SingleReference<TestTable> reference = new TableIdCache(5).reference();
 		TestTable testTable = reference.get();
 		testTable.setNValue(1L);
 		reference.update(testTable);
+		reference.persist();
+
+		// 存在缓存
+		Assert.assertEquals(1L, new TableIdCache(5).referenceIfPresent().get().getNValue().longValue());
+
+		reference.persistAndRemove();
 		testTable.setNValue(2L);
 		reference.update(testTable);
+		reference.persistAndRemove();
+
+		// 不存在缓存
+		Assert.assertNull(new TableIdCache(5).referenceIfPresent());
+		// 数值已更改
+		Assert.assertEquals(2L, new TableIdCache(5).reference().get().getNValue().longValue());
 	}
 }

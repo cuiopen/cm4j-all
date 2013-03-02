@@ -26,11 +26,4 @@ public interface IReference {
 	 * @return
 	 */
 	boolean isAllPersist();
-	
-	/**
-	 * 设置对应的缓存key
-	 * 
-	 * @param attachedKey
-	 */
-	void setAttachedKey(String attachedKey);
 }
