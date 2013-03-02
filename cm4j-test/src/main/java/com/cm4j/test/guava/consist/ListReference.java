@@ -51,6 +51,7 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 			throw new RuntimeException("ListValue中不包含此对象，无法删除");
 		}
 		// 注意顺序，先remove再change
+		e.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(e, DBState.D);
 		all_objects.remove(e);
 	}
@@ -60,9 +61,9 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	 */
 	public void update(E e) {
 		if (!all_objects.contains(e)) {
-			e.setAttachedKey(getAttachedKey());
 			all_objects.add(e);
 		}
+		e.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(e, DBState.U);
 	}
 
@@ -78,14 +79,6 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 			}
 		}
 		return true;
-	}
-
-	@Override
-	protected void attachedKey(String attachedKey) {
-		super.setAttachedKey(attachedKey);
-		for (E e : all_objects) {
-			e.setAttachedKey(attachedKey);
-		}
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -110,7 +103,7 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
 		for (CacheEntry cacheEntry : all_objects) {
 			if (cacheEntry == entry) {
-				cacheEntry.changeDbState(DBState.P);
+				cacheEntry.changeDbState(dbState);
 				return true;
 			}
 		}

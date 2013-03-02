@@ -54,4 +54,12 @@ public class ListTest {
 		reference.delete(table);
 		Assert.assertNull(new TableValueCache(4).findById(6));
 	}
+
+	@Test
+	public void changeTest2() {
+		ListReference<TestTable> reference = new TableValueCache(6).reference();
+		TestTable table = new TableValueCache(6).findById(4);
+		reference.update(table);
+
+	}
 }

@@ -35,6 +35,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	public void delete() {
 		Preconditions.checkNotNull(this.v, "SingleValue中不包含对象，无法删除");
 		// 注意顺序，先remove再change
+		this.v.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.D);
 		this.v = null;
 	}
@@ -44,8 +45,8 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	 */
 	public void update(V v) {
 		Preconditions.checkNotNull(v);
-		v.setAttachedKey(getAttachedKey());
 		this.v = v;
+		this.v.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
 	}
 
@@ -56,14 +57,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	@Override
 	protected boolean isAllPersist() {
 		return DBState.P == v.getDbState();
-	}
-
-	@Override
-	protected void attachedKey(String attachedKey) {
-		super.setAttachedKey(attachedKey);
-		if (v != null) {
-			v.setAttachedKey(attachedKey);
-		}
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })

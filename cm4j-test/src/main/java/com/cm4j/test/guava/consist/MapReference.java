@@ -29,10 +29,4 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
 		return false;
 	}
 
-	@Override
-	protected void attachedKey(String attachedKey) {
-		// TODO Auto-generated method stub
-		
-	}
-
 }

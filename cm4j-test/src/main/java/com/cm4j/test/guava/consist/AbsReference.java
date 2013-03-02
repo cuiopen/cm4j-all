@@ -45,13 +45,6 @@ public abstract class AbsReference {
 	protected abstract boolean changeDbState(CacheEntry entry, DBState dbState);
 
 	/**
-	 * 所属的缓存key
-	 * 
-	 * @param attachedKey
-	 */
-	protected abstract void attachedKey(String attachedKey);
-
-	/**
 	 * 持久化
 	 */
 	public void persist() {

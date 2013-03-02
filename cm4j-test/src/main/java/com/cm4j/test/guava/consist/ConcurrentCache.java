@@ -326,7 +326,7 @@ public class ConcurrentCache {
 				}
 
 				// 在put的时候对value设置所属key
-				((AbsReference) value).setAttachedKey(key);
+				value.setAttachedKey(key);
 
 				// 返回旧值
 				return oldValue;
