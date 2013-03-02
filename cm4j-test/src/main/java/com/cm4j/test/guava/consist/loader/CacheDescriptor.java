@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.loader;
 
+import com.cm4j.test.guava.consist.AbsReference;
 import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.IReference;
 import com.cm4j.test.guava.consist.keys.KEYS.JOINER;
 import com.google.common.base.Preconditions;
 
@@ -12,7 +12,7 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-19 下午01:13:54
  * 
  */
-public abstract class CacheDescriptor<V extends IReference> {
+public abstract class CacheDescriptor<V extends AbsReference> {
 
 	private Object[] params;
 

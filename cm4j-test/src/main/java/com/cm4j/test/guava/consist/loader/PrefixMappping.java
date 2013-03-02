@@ -1,6 +1,6 @@
 package com.cm4j.test.guava.consist.loader;
 
-import com.cm4j.test.guava.consist.IReference;
+import com.cm4j.test.guava.consist.AbsReference;
 import com.cm4j.test.guava.consist.usage.caches.FieldFlagCache;
 import com.cm4j.test.guava.consist.usage.caches.FieldFlagCollCache;
 import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
@@ -22,9 +22,9 @@ public enum PrefixMappping {
 	$4(new FieldFlagCache()),
 	$5(new FieldFlagCollCache());
 
-	private CacheDescriptor<? extends IReference> cacheDesc;
+	private CacheDescriptor<? extends AbsReference> cacheDesc;
 
-	PrefixMappping(CacheDescriptor<? extends IReference> cacheDesc) {
+	PrefixMappping(CacheDescriptor<? extends AbsReference> cacheDesc) {
 		this.cacheDesc = cacheDesc;
 	}
 
@@ -34,7 +34,7 @@ public enum PrefixMappping {
 	 * @param cacheDesc
 	 * @return
 	 */
-	public static PrefixMappping getMapping(CacheDescriptor<? extends IReference> cacheDesc) {
+	public static PrefixMappping getMapping(CacheDescriptor<? extends AbsReference> cacheDesc) {
 		PrefixMappping[] values = values();
 		for (PrefixMappping value : values) {
 			if (value.getCacheDesc().getClass().isAssignableFrom(cacheDesc.getClass())) {
@@ -44,7 +44,7 @@ public enum PrefixMappping {
 		return null;
 	}
 
-	public CacheDescriptor<? extends IReference> getCacheDesc() {
+	public CacheDescriptor<? extends AbsReference> getCacheDesc() {
 		return cacheDesc;
 	}
 }

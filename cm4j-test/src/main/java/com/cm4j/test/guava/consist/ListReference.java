@@ -3,6 +3,9 @@ package com.cm4j.test.guava.consist;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.entity.IEntity;
+
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
  * 此类为线程安全的
@@ -25,6 +28,10 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 		}
 		this.all_objects.addAll(all_objects);
 	}
+
+	/*
+	 * ===================== public methods =====================
+	 */
 
 	/**
 	 * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
@@ -59,8 +66,12 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 		ConcurrentCache.getInstance().changeDbState(e, DBState.U);
 	}
 
+	/*
+	 * ================== extend methods ====================
+	 */
+
 	@Override
-	public boolean isAllPersist() {
+	protected boolean isAllPersist() {
 		for (E e : all_objects) {
 			if (DBState.P != e.getDbState()) {
 				return false;
@@ -70,10 +81,39 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	}
 
 	@Override
-	public void setAttachedKey(String attachedKey) {
+	protected void attachedKey(String attachedKey) {
 		super.setAttachedKey(attachedKey);
 		for (E e : all_objects) {
 			e.setAttachedKey(attachedKey);
 		}
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	protected void persistDB() {
+		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+		for (CacheEntry entry : all_objects) {
+			if (DBState.P != entry.getDbState()) {
+				IEntity entity = entry.parseEntity();
+				if (DBState.U == entry.getDbState()) {
+					hibernate.saveOrUpdate(entity);
+				} else if (DBState.D == entry.getDbState()) {
+					hibernate.delete(entity);
+				}
+				entry.setDbState(DBState.P);
+				// 占位：发送到更新队列，状态P
+				ConcurrentCache.getInstance().sendToUpdateQueue(entry);
+			}
+		}
+	}
+
+	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
+		for (CacheEntry cacheEntry : all_objects) {
+			if (cacheEntry == entry) {
+				cacheEntry.changeDbState(DBState.P);
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -17,4 +17,22 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
 		return false;
 	}
 
+	@Override
+	public void persistDB() {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public boolean changeDbState(CacheEntry entry, DBState dbState) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	protected void attachedKey(String attachedKey) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

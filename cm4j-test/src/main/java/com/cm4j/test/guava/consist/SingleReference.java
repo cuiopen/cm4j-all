@@ -1,5 +1,7 @@
 package com.cm4j.test.guava.consist;
 
+import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.entity.IEntity;
 import com.google.common.base.Preconditions;
 
 /**
@@ -16,6 +18,10 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	public SingleReference(V value) {
 		this.v = value;
 	}
+
+	/*
+	 * ===================== public methods =====================
+	 */
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -43,16 +49,43 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
 	}
 
+	/*
+	 * ================== extend methods ====================
+	 */
+
 	@Override
-	public boolean isAllPersist() {
+	protected boolean isAllPersist() {
 		return DBState.P == v.getDbState();
 	}
 
 	@Override
-	public void setAttachedKey(String attachedKey) {
+	protected void attachedKey(String attachedKey) {
 		super.setAttachedKey(attachedKey);
 		if (v != null) {
 			v.setAttachedKey(attachedKey);
 		}
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Override
+	protected void persistDB() {
+		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+		CacheEntry entry = this.v;
+		IEntity entity = entry.parseEntity();
+		if (DBState.U == entry.getDbState()) {
+			hibernate.saveOrUpdate(entity);
+		} else if (DBState.D == entry.getDbState()) {
+			hibernate.delete(entity);
+		}
+		entry.setDbState(DBState.P);
+		// 占位：发送到更新队列，状态P
+		ConcurrentCache.getInstance().sendToUpdateQueue(entry);
+	}
+
+	@Override
+	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
+		Preconditions.checkArgument(entry == v, "不是同一对象，无法更改状态");
+		entry.changeDbState(dbState);
+		return true;
 	}
 }

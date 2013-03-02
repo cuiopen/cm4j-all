@@ -56,4 +56,11 @@ public abstract class CacheEntry {
 	synchronized void setDbState(DBState dbState) {
 		this.dbState = dbState;
 	}
+
+	public void changeDbState(DBState dbState) {
+		setDbState(dbState);
+		if (DBState.P != dbState) {
+			ConcurrentCache.getInstance().sendToUpdateQueue(this);
+		}
+	}
 }

@@ -3,7 +3,6 @@ package com.cm4j.test.guava.consist;
 import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -14,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.jboss.netty.handler.timeout.ReadTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +44,7 @@ import com.google.common.collect.AbstractSequentialIterator;
  * @since 2013-1-30 上午11:25:47
  * 
  * @param <String>
- * @param <IReference>
+ * @param <AbsReference>
  */
 public class ConcurrentCache {
 
@@ -71,7 +69,7 @@ public class ConcurrentCache {
 	static final int PERSIST_CHECK_INTERVAL = 5;
 
 	/* ---------------- Fields -------------- */
-	final CacheLoader<String, IReference> loader;
+	final CacheLoader<String, AbsReference> loader;
 	final int segmentMask;
 	final int segmentShift;
 	final Segment[] segments;
@@ -100,7 +98,7 @@ public class ConcurrentCache {
 	private static class HashEntry implements ReferenceEntry {
 		final String key;
 		final int hash;
-		volatile IReference value;
+		volatile AbsReference value;
 		final HashEntry next;
 
 		@Override
@@ -109,7 +107,7 @@ public class ConcurrentCache {
 		}
 
 		@Override
-		public IReference getValue() {
+		public AbsReference getValue() {
 			return value;
 		}
 
@@ -123,7 +121,7 @@ public class ConcurrentCache {
 			return next;
 		}
 
-		HashEntry(String key, int hash, HashEntry next, IReference value) {
+		HashEntry(String key, int hash, HashEntry next, AbsReference value) {
 			this.key = key;
 			this.hash = hash;
 			this.next = next;
@@ -215,7 +213,7 @@ public class ConcurrentCache {
 			return null;
 		}
 
-		IReference getLiveValue(String key, int hash, long now) {
+		AbsReference getLiveValue(String key, int hash, long now) {
 			HashEntry e = getLiveEntry(key, hash, now);
 			if (e != null) {
 				return e.getValue();
@@ -238,13 +236,13 @@ public class ConcurrentCache {
 			return e;
 		}
 
-		IReference get(String key, int hash, CacheLoader<String, IReference> loader, boolean isLoad) {
+		AbsReference get(String key, int hash, CacheLoader<String, AbsReference> loader, boolean isLoad) {
 			try {
 				if (count != 0) { // read-volatile
 					HashEntry e = getEntry(key, hash);
 					if (e != null) {
 						// 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
-						IReference value = getLiveValue(key, hash, now());
+						AbsReference value = getLiveValue(key, hash, now());
 						if (value != null) {
 							recordAccess(e);
 							return value;
@@ -261,12 +259,12 @@ public class ConcurrentCache {
 			return null;
 		}
 
-		IReference lockedGetOrLoad(String key, int hash, CacheLoader<String, IReference> loader) {
+		AbsReference lockedGetOrLoad(String key, int hash, CacheLoader<String, AbsReference> loader) {
 			lock();
 			try {
 				// 有锁情况下重读entry的值
 				// recheck,防止2个线程同时load，都从db获取数据，导致加载了2份数据
-				IReference value = getLiveValue(key, hash, now());
+				AbsReference value = getLiveValue(key, hash, now());
 				if (value == null) {
 					value = loader.load(key);
 				}
@@ -295,7 +293,7 @@ public class ConcurrentCache {
 			return false;
 		}
 
-		IReference put(String key, int hash, IReference value, boolean onlyIfAbsent) {
+		AbsReference put(String key, int hash, AbsReference value, boolean onlyIfAbsent) {
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -311,7 +309,7 @@ public class ConcurrentCache {
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				IReference oldValue;
+				AbsReference oldValue;
 				if (e != null) {
 					oldValue = e.value;
 					if (!onlyIfAbsent) {
@@ -388,7 +386,7 @@ public class ConcurrentCache {
 		/**
 		 * Remove; match on key only if value null, else match both.
 		 */
-		IReference remove(String key, int hash, IReference value) {
+		AbsReference remove(String key, int hash, AbsReference value) {
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -401,9 +399,9 @@ public class ConcurrentCache {
 				while (e != null && (e.hash != hash || !key.equals(e.key)))
 					e = e.next;
 
-				IReference oldValue = null;
+				AbsReference oldValue = null;
 				if (e != null) {
-					IReference v = e.value;
+					AbsReference v = e.value;
 					if (value == null || value.equals(v)) {
 						oldValue = v;
 						// All entries following removed node can stay
@@ -569,12 +567,12 @@ public class ConcurrentCache {
 
 	/* ---------------- Public operations -------------- */
 
-	public ConcurrentCache(CacheLoader<String, IReference> loader) {
+	public ConcurrentCache(CacheLoader<String, AbsReference> loader) {
 		this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, DEFAULT_CONCURRENCY_LEVEL, loader);
 	}
 
 	public ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel,
-			CacheLoader<String, IReference> loader) {
+			CacheLoader<String, AbsReference> loader) {
 		if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null)
 			throw new IllegalArgumentException();
 
@@ -663,7 +661,7 @@ public class ConcurrentCache {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <V extends IReference> V get(CacheDescriptor<V> desc) {
+	public <V extends AbsReference> V get(CacheDescriptor<V> desc) {
 		String key = desc.getKey();
 		int hash = rehash(key.hashCode());
 		return (V) segmentFor(hash).get(key, hash, loader, true);
@@ -675,14 +673,14 @@ public class ConcurrentCache {
 	 * @return 不存在时返回的reference为null
 	 */
 	@SuppressWarnings("unchecked")
-	public <V extends IReference> V getIfPresent(CacheDescriptor<V> desc) {
+	public <V extends AbsReference> V getIfPresent(CacheDescriptor<V> desc) {
 		String key = desc.getKey();
 		int hash = rehash(key.hashCode());
 		return (V) segmentFor(hash).get(key, hash, loader, false);
 	}
 
 	@SuppressWarnings("unchecked")
-	public <V extends IReference> V put(CacheDescriptor<V> desc, IReference value) {
+	public <V extends AbsReference> V put(CacheDescriptor<V> desc, AbsReference value) {
 		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 		Preconditions.checkNotNull(value);
 
@@ -695,7 +693,7 @@ public class ConcurrentCache {
 	 * 不存在时放入缓存
 	 */
 	@SuppressWarnings("unchecked")
-	public <V extends IReference> V putIfAbsent(CacheDescriptor<V> desc, IReference value) {
+	public <V extends AbsReference> V putIfAbsent(CacheDescriptor<V> desc, AbsReference value) {
 		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 		Preconditions.checkNotNull(value);
 
@@ -711,7 +709,7 @@ public class ConcurrentCache {
 	 * @param isRemove
 	 *            是否移除
 	 */
-	public void persistAndRemove(CacheDescriptor<? extends IReference> desc, boolean isRemove) {
+	public void persistAndRemove(CacheDescriptor<? extends AbsReference> desc, boolean isRemove) {
 		persistAndRemove(desc.getKey(), isRemove);
 	}
 
@@ -728,40 +726,10 @@ public class ConcurrentCache {
 
 		final int hash = rehash(key.hashCode());
 		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
-			@SuppressWarnings({ "rawtypes", "unchecked" })
 			@Override
 			public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
 				if (e != null && e.value != null && !e.value.isAllPersist()) {
-					HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-					if (e.value instanceof SingleReference) {
-						CacheEntry entry = ((SingleReference) e.value).get();
-						IEntity entity = entry.parseEntity();
-						if (DBState.U == entry.getDbState()) {
-							hibernate.saveOrUpdate(entity);
-						} else if (DBState.D == entry.getDbState()) {
-							hibernate.delete(entity);
-						}
-						entry.setDbState(DBState.P);
-						// 占位：发送到更新队列，状态P
-						sendToUpdateQueue(entry);
-					} else if (e.value instanceof ListReference) {
-						List<? extends CacheEntry> list = ((ListReference<? extends CacheEntry>) e.value).get();
-						for (CacheEntry entry : list) {
-							if (DBState.P != entry.getDbState()) {
-								IEntity entity = entry.parseEntity();
-								if (DBState.U == entry.getDbState()) {
-									hibernate.saveOrUpdate(entity);
-								} else if (DBState.D == entry.getDbState()) {
-									hibernate.delete(entity);
-								}
-								entry.setDbState(DBState.P);
-								// 占位：发送到更新队列，状态P
-								sendToUpdateQueue(entry);
-							}
-						}
-					} else {
-						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
-					}
+					e.value.persistDB();
 					if (isRemove) {
 						segment.removeEntry(e, hash);
 					}
@@ -771,7 +739,7 @@ public class ConcurrentCache {
 		});
 	}
 
-	public boolean replace(String key, final IReference oldValue, final IReference newValue) {
+	public boolean replace(String key, final AbsReference oldValue, final AbsReference newValue) {
 		if (oldValue == null || newValue == null)
 			throw new NullPointerException();
 		int hash = rehash(key.hashCode());
@@ -788,19 +756,19 @@ public class ConcurrentCache {
 		});
 	}
 
-	public IReference remove(String key) {
+	public AbsReference remove(String key) {
 		int hash = rehash(key.hashCode());
 		return segmentFor(hash).remove(key, hash, null);
 	}
 
-	public boolean remove(String key, IReference value) {
+	public boolean remove(String key, AbsReference value) {
 		int hash = rehash(key.hashCode());
 		if (value == null)
 			return false;
 		return segmentFor(hash).remove(key, hash, value) != null;
 	}
 
-	public void remove(CacheDescriptor<? extends IReference> desc) {
+	public void remove(CacheDescriptor<? extends AbsReference> desc) {
 		remove(desc.getKey());
 	}
 
@@ -814,7 +782,7 @@ public class ConcurrentCache {
 		return segmentFor(hash).containsKey(key, hash);
 	}
 
-	public boolean contains(CacheDescriptor<? extends IReference> cacheDesc) {
+	public boolean contains(CacheDescriptor<? extends AbsReference> cacheDesc) {
 		return containsKey(cacheDesc.getKey());
 	}
 
@@ -856,21 +824,8 @@ public class ConcurrentCache {
 					if (entry.getNumInUpdateQueue().get() != 0) {
 						return false;
 					}
-					// 更改CacheEntry的状态
-					if (e.value instanceof SingleReference) {
-						entry.setDbState(DBState.P);
+					if (e.value.changeDbState(entry, DBState.P)) {
 						return true;
-					} else if (e.value instanceof ListReference) {
-						@SuppressWarnings("unchecked")
-						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value).get();
-						for (CacheEntry cacheEntry : allObjects) {
-							if (cacheEntry == entry) {
-								cacheEntry.setDbState(DBState.P);
-								return true;
-							}
-						}
-					} else {
-						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
 					}
 				}
 				// 不存在或过期
@@ -900,22 +855,8 @@ public class ConcurrentCache {
 			public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
 				if (e != null && e.value != null && !isExpired(e, now())) {
 					// 更改CacheEntry的状态
-					if (e.value instanceof SingleReference) {
-						entry.setDbState(dbState);
-						sendToUpdateQueue(entry);
+					if (e.value.changeDbState(entry, dbState)) {
 						return null;
-					} else if (e.value instanceof ListReference) {
-						@SuppressWarnings("unchecked")
-						List<? extends CacheEntry> allObjects = ((ListReference<? extends CacheEntry>) e.value).get();
-						for (CacheEntry cacheEntry : allObjects) {
-							if (cacheEntry == entry) {
-								cacheEntry.setDbState(dbState);
-								sendToUpdateQueue(entry);
-								return null;
-							}
-						}
-					} else {
-						throw new ReadTimeoutException("缓存中对象类型不合法：" + e.value.getClass());
 					}
 				}
 				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
@@ -950,7 +891,7 @@ public class ConcurrentCache {
 
 		String getKey();
 
-		IReference getValue();
+		AbsReference getValue();
 
 		int getHash();
 
@@ -997,7 +938,7 @@ public class ConcurrentCache {
 		}
 
 		@Override
-		public IReference getValue() {
+		public AbsReference getValue() {
 			return null;
 		}
 
@@ -1054,7 +995,7 @@ public class ConcurrentCache {
 			}
 
 			@Override
-			public IReference getValue() {
+			public AbsReference getValue() {
 				return null;
 			}
 
@@ -1212,7 +1153,7 @@ public class ConcurrentCache {
 	 * 
 	 * @param entry
 	 */
-	private void sendToUpdateQueue(CacheEntry entry) {
+	void sendToUpdateQueue(CacheEntry entry) {
 		entry.getNumInUpdateQueue().incrementAndGet();
 		updateQueue.add(new CacheEntryInUpdateQueue(entry));
 	}
