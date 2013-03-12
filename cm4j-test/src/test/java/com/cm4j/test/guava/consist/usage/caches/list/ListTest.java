@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage;
+package com.cm4j.test.guava.consist.usage.caches.list;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -9,7 +9,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.ListReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
 
 /**
  * 1.缓存过期了不应该能修改状态? 使用引用队列？<br>
@@ -25,7 +24,7 @@ public class ListTest {
 
 	@Test
 	public void getTest() {
-		TableValueCache desc = new TableValueCache(1);
+		TableValueListCache desc = new TableValueListCache(1);
 
 		// 基于desc搜索结果上的二次筛选
 		TestTable table3 = desc.findById(3);
@@ -41,7 +40,7 @@ public class ListTest {
 
 	@Test
 	public void changeTest() {
-		ListReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableValueCache(6));
+		ListReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableValueListCache(6));
 		// 注意：这里的Value不一定就是和Key是一致的
 		// 不一致代表把新对象加入到此缓存中，这样缓存过期之前是没问题的，但过期后再查询db是有问题的，所以不要这样写
 
@@ -49,16 +48,16 @@ public class ListTest {
 		TestTable table = new TestTable(4, (long) 6);
 		reference.update(table);
 
-		Assert.assertEquals(6L, new TableValueCache(6).findById(4).getNValue().longValue());
+		Assert.assertEquals(6L, new TableValueListCache(6).findById(4).getNValue().longValue());
 
 		reference.delete(table);
-		Assert.assertNull(new TableValueCache(4).findById(6));
+		Assert.assertNull(new TableValueListCache(4).findById(6));
 	}
 
 	@Test
 	public void changeTest2() {
-		ListReference<TestTable> reference = new TableValueCache(6).reference();
-		TestTable table = new TableValueCache(6).findById(4);
+		ListReference<TestTable> reference = new TableValueListCache(6).reference();
+		TestTable table = new TableValueListCache(6).findById(4);
 		reference.update(table);
 
 	}

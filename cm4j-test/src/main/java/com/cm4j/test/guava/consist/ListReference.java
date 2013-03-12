@@ -5,6 +5,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.google.common.base.Preconditions;
 
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
@@ -23,9 +24,7 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	 * 初始化
 	 */
 	public ListReference(List<E> all_objects) {
-		if (all_objects == null) {
-			throw new IllegalArgumentException("cache wrap must not be null");
-		}
+		Preconditions.checkNotNull(all_objects);
 		this.all_objects.addAll(all_objects);
 	}
 
@@ -44,27 +43,24 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	}
 
 	/**
-	 * 删除
-	 */
-	public void delete(E e) {
-		if (!all_objects.contains(e)) {
-			throw new RuntimeException("ListValue中不包含此对象，无法删除");
-		}
-		// 注意顺序，先remove再change
-		e.setAttachedKey(getAttachedKey());
-		ConcurrentCache.getInstance().changeDbState(e, DBState.D);
-		all_objects.remove(e);
-	}
-
-	/**
 	 * 新增或修改
 	 */
 	public void update(E e) {
 		if (!all_objects.contains(e)) {
+			e.setAttachedKey(getAttachedKey());
 			all_objects.add(e);
 		}
-		e.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(e, DBState.U);
+	}
+
+	/**
+	 * 删除
+	 */
+	public void delete(E e) {
+		Preconditions.checkState(!all_objects.contains(e), "ListValue中不包含此对象，无法删除");
+		// 注意顺序，先remove再change
+		ConcurrentCache.getInstance().changeDbState(e, DBState.D);
+		all_objects.remove(e);
 	}
 
 	/*
@@ -108,5 +104,12 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 			}
 		}
 		return false;
+	}
+
+	@Override
+	protected void attachedKey(String attachedKey) {
+		for (CacheEntry v : all_objects) {
+			v.setAttachedKey(getAttachedKey());
+		}
 	}
 }

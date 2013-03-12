@@ -59,7 +59,7 @@ public class TestTable extends CacheEntry implements IEntity {
 		this.NValue++;
 		// 一般情况下是需要对NValue都要加锁
 		// 但这里，也在synchronized锁下，所以getNValue()方法显示也正常
-		System.out.println(this);
+		// System.out.println("TestTable value+1:" + this);
 	}
 
 	@Override

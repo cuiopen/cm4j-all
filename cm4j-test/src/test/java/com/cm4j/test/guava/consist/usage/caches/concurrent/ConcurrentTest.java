@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage;
+package com.cm4j.test.guava.consist.usage.caches.concurrent;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
@@ -11,9 +11,15 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
-import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
+import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
 
+/**
+ * 并发测试
+ * 
+ * @author Yang.hao
+ * @since 2013-3-6 上午10:12:46
+ * 
+ */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath*:test_1/spring-ds.xml" })
 public class ConcurrentTest {
@@ -60,23 +66,6 @@ public class ConcurrentTest {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		}
-	}
-
-	@Test
-	public void concurrentTest() throws InterruptedException, BrokenBarrierException {
-		TableValueCache desc = new TableValueCache(1);
-		ConcurrentCache.getInstance().get(desc);
-
-		new Thread(new concurrentThread(), "update thread").start();
-		System.out.println(ConcurrentCache.getInstance().contains(new TableIdCache(1)));
-	}
-
-	public class concurrentThread implements Runnable {
-		@Override
-		public void run() {
-			SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(1));
-			reference.update(reference.get());
 		}
 	}
 }

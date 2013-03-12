@@ -23,26 +23,32 @@ public abstract class AbsReference {
 	public abstract <V> V get();
 
 	/**
-	 * 是否所有对象都与数据库保持一致<br>
-	 * 如果是coll集合，则内部需维持锁的一致性
+	 * 是否所有对象都与数据库保持一致，缓存过期是否可移除的判断条件之一，此方法在lock下被调用<br>
 	 * 
 	 * @return
 	 */
 	protected abstract boolean isAllPersist();
 
 	/**
-	 * 持久化到数据库，用于persistAndRemove()
+	 * 持久化到数据库，用于persistAndRemove()，此方法在lock下被调用
 	 */
 	protected abstract void persistDB();
 
 	/**
-	 * 修改单个对象的状态
+	 * 缓存中单个对象的修改后更改此对象的状态，此方法在lock下被调用
 	 * 
 	 * @param entry
 	 * @param dbState
 	 * @return
 	 */
 	protected abstract boolean changeDbState(CacheEntry entry, DBState dbState);
+
+	/**
+	 * 在从db获取数据之后，设置缓存内数据所属的key，用来辨识此对象是哪个缓存的
+	 * 
+	 * @param attachedKey
+	 */
+	protected abstract void attachedKey(String attachedKey);
 
 	/**
 	 * 持久化

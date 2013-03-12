@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.caches;
+package com.cm4j.test.guava.consist.usage.caches.list;
 
 import java.util.List;
 
@@ -19,9 +19,9 @@ import com.google.common.base.Preconditions;
  * @since 2013-2-27 下午03:23:03
  *
  */
-public class TableValueCache extends CacheDescriptor<ListReference<TestTable>> {
+public class TableValueListCache extends CacheDescriptor<ListReference<TestTable>> {
 
-	public TableValueCache(Object... params) {
+	public TableValueListCache(Object... params) {
 		super(params);
 	}
 

@@ -41,15 +41,15 @@ public abstract class CacheEntry {
 	 */
 	public abstract IEntity parseEntity();
 
-	String getAttachedKey() {
+	public String getAttachedKey() {
 		return attachedKey;
 	}
 
-	void setAttachedKey(String attachedKey) {
+	public void setAttachedKey(String attachedKey) {
 		this.attachedKey = attachedKey;
 	}
 
-	DBState getDbState() {
+	public DBState getDbState() {
 		return dbState;
 	}
 

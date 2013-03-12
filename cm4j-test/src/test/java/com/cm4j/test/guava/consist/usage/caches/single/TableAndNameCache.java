@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.caches;
+package com.cm4j.test.guava.consist.usage.caches.single;
 
 import java.util.List;
 
@@ -10,6 +10,7 @@ import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
 import com.google.common.base.Preconditions;
 
 public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndNameVO>> {

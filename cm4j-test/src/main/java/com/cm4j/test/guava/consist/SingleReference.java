@@ -35,7 +35,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	public void delete() {
 		Preconditions.checkNotNull(this.v, "SingleValue中不包含对象，无法删除");
 		// 注意顺序，先remove再change
-		this.v.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.D);
 		this.v = null;
 	}
@@ -45,8 +44,11 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	 */
 	public void update(V v) {
 		Preconditions.checkNotNull(v);
+		if (this.v == null){
+			// 代表v是新增的
+			v.setAttachedKey(getAttachedKey());
+		}
 		this.v = v;
-		this.v.setAttachedKey(getAttachedKey());
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
 	}
 
@@ -56,7 +58,9 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 
 	@Override
 	protected boolean isAllPersist() {
-		return DBState.P == v.getDbState();
+		// TODO 删除了这个状态该怎么控制？
+		// 同样的问题也存在其他reference
+		return DBState.P == this.v.getDbState();
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -77,8 +81,15 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 
 	@Override
 	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-		Preconditions.checkArgument(entry == v, "不是同一对象，无法更改状态");
+		Preconditions.checkArgument(entry == this.v, "不是同一对象，无法更改状态");
 		entry.changeDbState(dbState);
 		return true;
+	}
+	
+	@Override
+	protected void attachedKey(String attachedKey) {
+		if (this.v != null){
+			this.v.setAttachedKey(getAttachedKey());
+		}
 	}
 }

@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.caches;
+package com.cm4j.test.guava.consist.usage.caches.single;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.ServiceManager;

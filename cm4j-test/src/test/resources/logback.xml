@@ -22,7 +22,7 @@
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<!-- encoders are assigned by default the type ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
 		<encoder>
-			<pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] \t- %msg%n</pattern>
+			<pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] [%file:%line] \t- %msg%n</pattern>
 			<!-- <pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}\t- %msg%n</pattern> -->
 		</encoder>
 	</appender>
@@ -38,6 +38,33 @@
 	<logger name="org.jboss.netty">
 		<level value="debug" />
 		<appender-ref ref="STDOUT" />
+	</logger>
+	
+	
+	<!-- PERF4J -->
+	<!--统计记录输出文件 -->
+	<appender name="perf4jFile"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>../logs/log-perf.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>../logs/log-perf.%d{yyyy-MM-dd}.log</fileNamePattern>
+		</rollingPolicy>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<pattern>%m%n</pattern>
+		</layout>
+	</appender>
+	<!--获取所有的StopWatch 信息并处理 -->
+	<appender name="perf4j"
+		class="com.cm4j.test.slf4j.Slf4JAsyncCoalescingStatisticsAppender">
+		<!--时间间隔 -->
+		<param name="timeSlice" value="5000" />
+		<appender-ref ref="perf4jFile" />
+	</appender>
+
+	<!--org.perf4j.TimingLogger是StopWath的日志名，additivity false表示只写到perf4j文件 -->
+	<logger name="org.perf4j.TimingLogger" additivity="false">
+		<level value="DEBUG" />
+		<appender-ref ref="perf4j" />
 	</logger>
 	
 	<root>

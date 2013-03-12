@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage;
+package com.cm4j.test.guava.consist.usage.caches.single;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -9,9 +9,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
-import com.cm4j.test.guava.consist.usage.caches.TableAndNameVO;
-import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
+import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
 
 /**
  * 

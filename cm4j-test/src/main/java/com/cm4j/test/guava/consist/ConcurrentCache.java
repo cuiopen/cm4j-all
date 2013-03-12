@@ -3,6 +3,7 @@ package com.cm4j.test.guava.consist;
 import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Iterator;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -13,6 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.perf4j.StopWatch;
+import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,26 +58,28 @@ public class ConcurrentCache {
 	}
 
 	/* ---------------- Constants -------------- */
-	static final int DEFAULT_INITIAL_CAPACITY = 16;
+	// TODO 默认为16
+	static final int DEFAULT_INITIAL_CAPACITY = 1;
 	static final float DEFAULT_LOAD_FACTOR = 0.75f;
-	static final int DEFAULT_CONCURRENCY_LEVEL = 1; // TODO 默认设为16
+	// TODO 默认设为16
+	static final int DEFAULT_CONCURRENCY_LEVEL = 1;
 	static final int MAXIMUM_CAPACITY = 1 << 30;
 	static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
 	static final int RETRIES_BEFORE_LOCK = 2;
-	/** 更新队列检测间隔，单位s */
-	static final int UPDATE_QUEUE_CHECK_INTERVAL = 60;
+	/** TODO 更新队列检测间隔，单位s */
+	static final int UPDATE_QUEUE_CHECK_INTERVAL = 3;
+	/** 间隔多少次检查，可持久化，总间隔时间也就是 5 * 60s = 5min */
+	static final int PERSIST_CHECK_INTERVAL = 5;
 	/** 达到多少个对象，可持久化 */
 	static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
-	/** 间隔多少次检查，可持久化 */
-	static final int PERSIST_CHECK_INTERVAL = 5;
+	// TODO 默认过期纳秒，完成时需更改为较长时间过期
+	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(30);
 
 	/* ---------------- Fields -------------- */
 	final CacheLoader<String, AbsReference> loader;
 	final int segmentMask;
 	final int segmentShift;
 	final Segment[] segments;
-	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(300);
 
 	private final ConcurrentLinkedQueue<CacheEntryInUpdateQueue> updateQueue;
 	private final ScheduledExecutorService service;
@@ -96,10 +101,11 @@ public class ConcurrentCache {
 
 	/* ---------------- Inner Classes -------------- */
 	private static class HashEntry implements ReferenceEntry {
+		// HashEntery内对象的final不变性来降低读操作对加锁的需求
 		final String key;
 		final int hash;
-		volatile AbsReference value;
 		final HashEntry next;
+		volatile AbsReference value;
 
 		@Override
 		public String getKey() {
@@ -181,6 +187,7 @@ public class ConcurrentCache {
 		transient volatile AtomicReferenceArray<HashEntry> table;
 		final float loadFactor;
 
+		final Queue<ReferenceEntry> recencyQueue = new ConcurrentLinkedQueue<ReferenceEntry>();
 		final AccessQueue accessQueue = new AccessQueue();
 		final AtomicInteger readCount = new AtomicInteger();
 
@@ -221,6 +228,14 @@ public class ConcurrentCache {
 			return null;
 		}
 
+		/**
+		 * 查找存活的Entry，包含Persist检测
+		 * 
+		 * @param key
+		 * @param hash
+		 * @param now
+		 * @return
+		 */
 		HashEntry getLiveEntry(String key, int hash, long now) {
 			HashEntry e = getEntry(key, hash);
 			if (e == null) {
@@ -237,12 +252,14 @@ public class ConcurrentCache {
 		}
 
 		AbsReference get(String key, int hash, CacheLoader<String, AbsReference> loader, boolean isLoad) {
+			final StopWatch watch = new Slf4JStopWatch();
 			try {
 				if (count != 0) { // read-volatile
 					HashEntry e = getEntry(key, hash);
 					if (e != null) {
 						// 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
 						AbsReference value = getLiveValue(key, hash, now());
+						watch.lap("cache.getLiveValue()");
 						if (value != null) {
 							recordAccess(e);
 							return value;
@@ -251,30 +268,68 @@ public class ConcurrentCache {
 				}
 				if (isLoad) {
 					// at this point e is either null or expired;
-					return lockedGetOrLoad(key, hash, loader);
+					AbsReference ref = lockedGetOrLoad(key, hash, loader);
+					watch.lap("cache.lockedGetOrLoad()");
+					return ref;
 				}
 			} finally {
 				postReadCleanup();
+				watch.stop("cache.get()");
 			}
 			return null;
 		}
 
 		AbsReference lockedGetOrLoad(String key, int hash, CacheLoader<String, AbsReference> loader) {
+			HashEntry e;
+			AbsReference value = null;
+
 			lock();
 			try {
-				// 有锁情况下重读entry的值
-				// recheck,防止2个线程同时load，都从db获取数据，导致加载了2份数据
-				AbsReference value = getLiveValue(key, hash, now());
-				if (value == null) {
-					value = loader.load(key);
+				// re-read ticker once inside the lock
+				long now = now();
+				preWriteCleanup(now);
+
+				int newCount = this.count - 1;
+				AtomicReferenceArray<HashEntry> table = this.table;
+				int index = hash & (table.length() - 1);
+				HashEntry first = table.get(index);
+
+				for (e = first; e != null; e = e.next) {
+					String entryKey = e.getKey();
+					if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
+						value = e.getValue();
+
+						if (value != null && !(map.isExpired(e, now) && !value.isAllPersist())) {
+							recordAccess(e);
+							return value;
+						}
+
+						// immediately reuse invalid entries
+						accessQueue.remove(e);
+						this.count = newCount; // write-volatile
+						break;
+					}
 				}
+
+				if (e == null) {
+					e = new HashEntry(key, hash, first, value);
+					table.set(index, e);
+				}
+
+				// 获取且保存
+				StopWatch watch = new Slf4JStopWatch();
+				value = loader.load(key);
+				watch.stop("cache.loadFromDB()");
 
 				if (value != null) {
 					put(key, hash, value, false);
+				} else {
+					map.logger.debug("cache[{}] not found", key);
 				}
 				return value;
 			} finally {
 				unlock();
+				postWriteCleanup();
 			}
 		}
 
@@ -294,6 +349,7 @@ public class ConcurrentCache {
 		}
 
 		AbsReference put(String key, int hash, AbsReference value, boolean onlyIfAbsent) {
+			final StopWatch watch = new Slf4JStopWatch();
 			lock();
 			try {
 				preWriteCleanup(now());
@@ -320,67 +376,80 @@ public class ConcurrentCache {
 					oldValue = null;
 					++modCount;
 					e = new HashEntry(key, hash, first, value);
-					recordAccess(e);
 					tab.set(index, e);
 					count = c; // write-volatile
+					recordAccess(e);
 				}
 
 				// 在put的时候对value设置所属key
 				value.setAttachedKey(key);
+				value.attachedKey(key);
 
 				// 返回旧值
 				return oldValue;
 			} finally {
 				unlock();
 				postWriteCleanup();
+				watch.stop("cache.put()");
 			}
 		}
 
 		void rehash() {
+			map.logger.debug("cache rehash(...)");
+			StopWatch watch = new Slf4JStopWatch();
 			AtomicReferenceArray<HashEntry> oldTable = table;
 			int oldCapacity = oldTable.length();
 			if (oldCapacity >= MAXIMUM_CAPACITY)
 				return;
 
+			int newCount = count;
 			AtomicReferenceArray<HashEntry> newTable = HashEntry.newArray(oldCapacity << 1);
-			threshold = (int) (newTable.length() * loadFactor);
-			int sizeMask = newTable.length() - 1;
-			for (int i = 0; i < oldCapacity; i++) {
+			threshold = newTable.length() * 3 / 4;
+			int newMask = newTable.length() - 1;
+			for (int oldIndex = 0; oldIndex < oldCapacity; ++oldIndex) {
 				// We need to guarantee that any existing reads of old Map can
 				// proceed. So we cannot yet null out each bin.
-				HashEntry e = oldTable.get(i);
+				HashEntry head = oldTable.get(oldIndex);
 
-				if (e != null) {
-					HashEntry next = e.next;
-					int idx = e.hash & sizeMask;
+				if (head != null) {
+					HashEntry next = head.next;
+					int headIndex = head.getHash() & newMask;
 
 					// Single node on list
-					if (next == null)
-						newTable.set(idx, e);
-
-					else {
-						// Reuse trailing consecutive sequence at same slot
-						HashEntry lastRun = e;
-						int lastIdx = idx;
-						for (HashEntry last = next; last != null; last = last.next) {
-							int k = last.hash & sizeMask;
-							if (k != lastIdx) {
-								lastIdx = k;
-								lastRun = last;
+					if (next == null) {
+						newTable.set(headIndex, head);
+					} else {
+						HashEntry tail = head;
+						int tailIndex = headIndex;
+						for (HashEntry e = next; e != null; e = e.next) {
+							int newIndex = e.getHash() & newMask;
+							if (newIndex != tailIndex) {
+								// The index changed. We'll need to copy the
+								// previous entry.
+								tailIndex = newIndex;
+								tail = e;
 							}
 						}
-						newTable.set(lastIdx, lastRun);
+						newTable.set(tailIndex, tail);
 
-						// Clone all remaining nodes
-						for (HashEntry p = e; p != lastRun; p = p.next) {
-							int k = p.hash & sizeMask;
-							HashEntry n = newTable.get(k);
-							newTable.set(k, new HashEntry(p.key, p.hash, n, p.value));
+						// Clone nodes leading up to the tail.
+						for (HashEntry e = head; e != tail; e = e.next) {
+							int newIndex = e.getHash() & newMask;
+							HashEntry newNext = newTable.get(newIndex);
+							HashEntry newFirst = copyEntry(e, newNext);
+							if (newFirst != null) {
+								newTable.set(newIndex, newFirst);
+							} else {
+								accessQueue.remove(e);
+								newCount--;
+							}
 						}
 					}
 				}
 			}
 			table = newTable;
+			this.count = newCount;
+			watch.stop("cache.rehash()");
 		}
 
 		/**
@@ -391,31 +460,13 @@ public class ConcurrentCache {
 			try {
 				preWriteCleanup(now());
 
-				int c = count - 1;
-				AtomicReferenceArray<HashEntry> tab = table;
-				int index = hash & (tab.length() - 1);
-				HashEntry first = tab.get(index);
-				HashEntry e = first;
-				while (e != null && (e.hash != hash || !key.equals(e.key)))
-					e = e.next;
-
+				HashEntry e = getEntry(key, hash);
 				AbsReference oldValue = null;
 				if (e != null) {
 					AbsReference v = e.value;
 					if (value == null || value.equals(v)) {
 						oldValue = v;
-						// All entries following removed node can stay
-						// in list, but all preceding ones need to be
-						// cloned.
-						++modCount;
-						HashEntry newFirst = e.next;
-						for (HashEntry p = first; p != e; p = p.next)
-							newFirst = new HashEntry(p.key, p.hash, newFirst, p.value);
-						tab.set(index, newFirst);
-
-						// 从队列移除
-						accessQueue.remove(e);
-						count = c; // write-volatile
+						removeEntry(e, e.getHash());
 					}
 				}
 				return oldValue;
@@ -467,38 +518,93 @@ public class ConcurrentCache {
 					expireEntries(now);
 				} finally {
 					unlock();
-					// don't call postWriteCleanup as we're in a read
 				}
 			}
 		}
 
 		// 调用方都有锁
 		void expireEntries(long now) {
+			drainRecencyQueue();
+
 			ReferenceEntry e;
+			int firstHash = 0;
 			while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
+				if (firstHash == 0) {
+					// 第一次循环，设置first
+					firstHash = e.getHash();
+				} else if (e.getHash() == firstHash) {
+					// 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
+					break;
+				}
+
+				// 注意：这里的无限循环
+				map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
+
+				if (accessQueue.size() != count) {
+					throw new RuntimeException("wo ca1");
+				}
+
 				if (e.getValue().isAllPersist()) {
 					removeEntry((HashEntry) e, e.getHash());
+
+					if (accessQueue.size() != count) {
+						throw new RuntimeException("wo ca2");
+					}
 				} else {
 					recordAccess(e);
+
+					if (accessQueue.size() != count) {
+						throw new RuntimeException("wo ca3");
+					}
 				}
 			}
 		}
 
-		void removeEntry(HashEntry e, int hash) {
+		void removeEntry(HashEntry entry, int hash) {
 			int c = count - 1;
 			AtomicReferenceArray<HashEntry> tab = table;
 			int index = hash & (tab.length() - 1);
 			HashEntry first = tab.get(index);
 
-			++modCount;
-			HashEntry newFirst = e.next;
-			for (HashEntry p = first; p != e; p = p.next) {
-				newFirst = new HashEntry(p.key, p.hash, newFirst, p.value);
+			for (HashEntry e = first; e != null; e = e.next) {
+				if (e == entry) { // TODO 为啥这里不是根据key和hash进行判断？
+					// 是否remove后面的，再remove前面的 access 是copied 的？
+					++modCount;
+					HashEntry newFirst = removeEntryFromChain(first, entry);
+					tab.set(index, newFirst);
+					count = c; // write-volatile
+					map.logger.debug("缓存[{}]被移除", entry.key);
+					return;
+				}
 			}
-			tab.set(index, newFirst);
+		}
+
+		HashEntry removeEntryFromChain(HashEntry first, HashEntry entry) {
+			if (!accessQueue.contains(entry)) {
+				throw new RuntimeException("wo ca ca");
+			}
+			HashEntry newFirst = entry.next;
+			for (HashEntry e = first; e != entry; e = e.next) {
+				newFirst = copyEntry(e, newFirst);
+			}
 			// 从队列移除
-			accessQueue.remove(e);
-			count = c; // write-volatile
+			accessQueue.remove(entry);
+			return newFirst;
+		}
+
+		HashEntry copyEntry(HashEntry original, HashEntry newNext) {
+			HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.value);
+			copyAccessEntry(original, newEntry);
+			return newEntry;
+		}
+
+		void copyAccessEntry(HashEntry original, HashEntry newEntry) {
+			newEntry.setAccessTime(original.getAccessTime());
+
+			connectAccessOrder(original.getPreviousInAccessQueue(), newEntry);
+			connectAccessOrder(newEntry, original.getNextInAccessQueue());
+
+			nullifyAccessOrder(original);
 		}
 
 		/**
@@ -537,14 +643,7 @@ public class ConcurrentCache {
 		}
 
 		void runLockedCleanup(long now) {
-			if (tryLock()) {
-				try {
-					// 过期，且移除
-					expireEntries(now); // calls drainRecencyQueue
-				} finally {
-					unlock();
-				}
-			}
+			tryExpireEntries(now);
 		}
 
 		void runUnlockedCleanup() {
@@ -560,9 +659,17 @@ public class ConcurrentCache {
 		 */
 		void recordAccess(ReferenceEntry e) {
 			e.setAccessTime(now());
-			accessQueue.add(e);
+			recencyQueue.add(e);
 		}
 
+		void drainRecencyQueue() {
+			ReferenceEntry e;
+			while ((e = recencyQueue.poll()) != null) {
+				if (accessQueue.contains(e)) {
+					accessQueue.add(e);
+				}
+			}
+		}
 	}
 
 	/* ---------------- Public operations -------------- */
@@ -685,6 +792,16 @@ public class ConcurrentCache {
 		Preconditions.checkNotNull(value);
 
 		String key = desc.getKey();
+		int hash = rehash(key.hashCode());
+		return (V) segmentFor(hash).put(key, hash, value, false);
+	}
+
+	// TODO 临时方法
+	@SuppressWarnings("unchecked")
+	public <V extends AbsReference> V put(String key, AbsReference value) {
+		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
+		Preconditions.checkNotNull(value);
+
 		int hash = rehash(key.hashCode());
 		return (V) segmentFor(hash).put(key, hash, value, false);
 	}
@@ -812,14 +929,15 @@ public class ConcurrentCache {
 	 * @return 是否成功修改
 	 */
 	boolean changeDbStatePersist(final CacheEntry entry) {
+		StopWatch watch = new Slf4JStopWatch();
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
 
 		final String key = entry.getAttachedKey();
 		int hash = rehash(key.hashCode());
-		return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
+		boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
 			@Override
 			public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-				if (e != null && e.value != null && !isExpired(e, now())) {
+				if (e != null && e.value != null && !isExipredAndAllPersist(e, now())) {
 					// recheck，不等于0代表有其他线程修改了，所以不能改为P状态
 					if (entry.getNumInUpdateQueue().get() != 0) {
 						return false;
@@ -832,6 +950,8 @@ public class ConcurrentCache {
 				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
 			}
 		});
+		watch.stop("cache.changeDbStatePersist()");
+		return result;
 	}
 
 	/**
@@ -842,6 +962,7 @@ public class ConcurrentCache {
 	 *            U or D,不允许P
 	 */
 	void changeDbState(final CacheEntry entry, final DBState dbState) {
+		StopWatch watch = new Slf4JStopWatch();
 		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
 		Preconditions.checkNotNull(entry.getAttachedKey(), "CacheEntry中attachedKey不允许为null");
@@ -853,7 +974,7 @@ public class ConcurrentCache {
 		segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
 			@Override
 			public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-				if (e != null && e.value != null && !isExpired(e, now())) {
+				if (e != null && e.value != null && !isExipredAndAllPersist(e, now())) {
 					// 更改CacheEntry的状态
 					if (e.value.changeDbState(entry, dbState)) {
 						return null;
@@ -862,6 +983,7 @@ public class ConcurrentCache {
 				throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
 			}
 		});
+		watch.stop("cache.changeDbState()");
 	}
 
 	/* ---------------- expiration ---------------- */
@@ -872,6 +994,20 @@ public class ConcurrentCache {
 
 	private boolean isExpired(ReferenceEntry entry, long now) {
 		if (now - entry.getAccessTime() > expireAfterAccessNanos) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 过期且所有对象已存储
+	 * 
+	 * @param entry
+	 * @param now
+	 * @return
+	 */
+	private boolean isExipredAndAllPersist(ReferenceEntry entry, long now) {
+		if (isExpired(entry, now) && entry.getValue().isAllPersist()) {
 			return true;
 		}
 		return false;
@@ -1154,8 +1290,10 @@ public class ConcurrentCache {
 	 * @param entry
 	 */
 	void sendToUpdateQueue(CacheEntry entry) {
+		StopWatch watch = new Slf4JStopWatch();
 		entry.getNumInUpdateQueue().incrementAndGet();
 		updateQueue.add(new CacheEntryInUpdateQueue(entry));
+		watch.stop("cache.sendToUpdateQueue()");
 	}
 
 	// 缓存关闭标识
@@ -1196,6 +1334,7 @@ public class ConcurrentCache {
 	private void consumeUpdateQueue(boolean doNow) {
 		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
 		if (doNow || updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
+			StopWatch watch = new Slf4JStopWatch();
 			CacheEntryInUpdateQueue wrapper = null;
 			while ((wrapper = updateQueue.poll()) != null) {
 				CacheEntry reference = wrapper.getReference();
@@ -1206,7 +1345,8 @@ public class ConcurrentCache {
 					IEntity entity = wrapper.getEntity();
 					if (entity != null && DBState.P != wrapper.getDbState()) {
 						// TODO 发送db去批处理
-						logger.debug(reference.getDbState() + " " + entity.toString());
+						// logger.debug(reference.getDbState() + " " +
+						// entity.toString());
 
 						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 						if (DBState.U == wrapper.getDbState()) {
@@ -1220,6 +1360,7 @@ public class ConcurrentCache {
 					}
 				}
 			}
+			watch.stop("cache.consumeUpdateQueue()");
 		}
 	}
 
@@ -1238,17 +1379,21 @@ public class ConcurrentCache {
 			this.dbState = reference.getDbState();
 
 			IEntity entity = reference.parseEntity();
+			StopWatch watch = new Slf4JStopWatch();
 			if (reference instanceof IEntity && ((IEntity) reference != entity)) {
 				// 内存地址不同，创建了新对象
 				this.entity = entity;
+				watch.lap("cache.entry.new_object()");
 			} else {
 				// 其他情况，深拷贝
 				try {
 					this.entity = new DeepCopyUtil().deepCopy(reference.parseEntity());
+					watch.lap("cache.entry.deep_copy()");
 				} catch (DeepCopyException e) {
 					throw new RuntimeException("CacheEntry[" + reference.getAttachedKey() + "]不能被deepCopy", e);
 				}
 			}
+			watch.stop("cache.entry.init_finish()");
 		}
 
 		/**

@@ -1,11 +1,11 @@
 package com.cm4j.test.guava.consist.loader;
 
 import com.cm4j.test.guava.consist.AbsReference;
-import com.cm4j.test.guava.consist.usage.caches.FieldFlagCache;
-import com.cm4j.test.guava.consist.usage.caches.FieldFlagCollCache;
-import com.cm4j.test.guava.consist.usage.caches.TableAndNameCache;
-import com.cm4j.test.guava.consist.usage.caches.TableIdCache;
-import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
+import com.cm4j.test.guava.consist.usage.caches.list.FieldFlagListCache;
+import com.cm4j.test.guava.consist.usage.caches.list.TableValueListCache;
+import com.cm4j.test.guava.consist.usage.caches.single.FieldFlagSingleCache;
+import com.cm4j.test.guava.consist.usage.caches.single.TableAndNameCache;
+import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
 
 /**
  * 缓存前缀与描述的映射
@@ -17,10 +17,10 @@ import com.cm4j.test.guava.consist.usage.caches.TableValueCache;
 public enum PrefixMappping {
 
 	$1(new TableIdCache()),
-	$2(new TableValueCache()),
+	$2(new TableValueListCache()),
 	$3(new TableAndNameCache()),
-	$4(new FieldFlagCache()),
-	$5(new FieldFlagCollCache());
+	$4(new FieldFlagSingleCache()),
+	$5(new FieldFlagListCache());
 
 	private CacheDescriptor<? extends AbsReference> cacheDesc;
 
