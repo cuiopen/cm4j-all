@@ -73,7 +73,9 @@ public class ConcurrentCache {
 	/** 达到多少个对象，可持久化 */
 	static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(30);
+	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(10);
+	// TODO debug模式
+	boolean isDebug = true;
 
 	/* ---------------- Fields -------------- */
 	final CacheLoader<String, AbsReference> loader;
@@ -311,11 +313,6 @@ public class ConcurrentCache {
 					}
 				}
 
-				if (e == null) {
-					e = new HashEntry(key, hash, first, value);
-					table.set(index, e);
-				}
-
 				// 获取且保存
 				StopWatch watch = new Slf4JStopWatch();
 				value = loader.load(key);
@@ -540,21 +537,21 @@ public class ConcurrentCache {
 				// 注意：这里的无限循环
 				map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
 
-				if (accessQueue.size() != count) {
-					throw new RuntimeException("wo ca1");
+				if (map.isDebug && accessQueue.size() != count) {
+					throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 				}
 
 				if (e.getValue().isAllPersist()) {
 					removeEntry((HashEntry) e, e.getHash());
 
-					if (accessQueue.size() != count) {
-						throw new RuntimeException("wo ca2");
+					if (map.isDebug && accessQueue.size() != count) {
+						throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 					}
 				} else {
 					recordAccess(e);
 
-					if (accessQueue.size() != count) {
-						throw new RuntimeException("wo ca3");
+					if (map.isDebug && accessQueue.size() != count) {
+						throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 					}
 				}
 			}
@@ -580,8 +577,8 @@ public class ConcurrentCache {
 		}
 
 		HashEntry removeEntryFromChain(HashEntry first, HashEntry entry) {
-			if (!accessQueue.contains(entry)) {
-				throw new RuntimeException("wo ca ca");
+			if (map.isDebug && !accessQueue.contains(entry)) {
+				throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.key);
 			}
 			HashEntry newFirst = entry.next;
 			for (HashEntry e = first; e != entry; e = e.next) {
