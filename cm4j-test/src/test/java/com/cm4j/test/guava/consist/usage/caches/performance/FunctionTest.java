@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -25,6 +27,8 @@ import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath*:test_1/spring-ds.xml" })
 public class FunctionTest {
+
+	public final Logger logger = LoggerFactory.getLogger(getClass());
 
 	@Test
 	public void funcTest() throws InterruptedException, BrokenBarrierException {
@@ -60,16 +64,19 @@ public class FunctionTest {
 			try {
 				barrier.await();
 				for (int i = 0; i < 20000; i++) { // 执行20000次
-					int random = RandomUtils.nextInt(1000);
+					int random = 0;
+					while (random < 100) {
+						random = RandomUtils.nextInt(1000);
+					}
 					if (random >= 100) {
 						SingleReference<TestTable> reference = new TableIdCache(random).reference();
 						reference.get().increaseValue();
 						reference.update(reference.get());
 
-						counter.incrementAndGet();
+						logger.debug("线程+1,now = {}", counter.incrementAndGet());
 
 						// 为增加并发异常，暂停50ms
-						// Thread.sleep(50);
+						Thread.sleep(50);
 					}
 				}
 				barrier.await();

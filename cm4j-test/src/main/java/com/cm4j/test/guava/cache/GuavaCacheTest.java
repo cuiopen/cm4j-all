@@ -38,7 +38,7 @@ public class GuavaCacheTest {
 		System.out.println(Integer.toBinaryString(63));
 		System.out.println(cache.getIfPresent("ccd"));
 
-		new Thread(new T()).start();
+//		new Thread(new T()).start();
 		System.out.println(cache.get("ccd"));
 		System.out.println(cache.get("ccd"));
 

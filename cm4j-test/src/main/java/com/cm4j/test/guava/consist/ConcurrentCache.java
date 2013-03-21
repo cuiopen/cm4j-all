@@ -73,7 +73,7 @@ public class ConcurrentCache {
 	/** 达到多少个对象，可持久化 */
 	static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(10);
+	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(50);
 	// TODO debug模式
 	boolean isDebug = true;
 
@@ -190,6 +190,7 @@ public class ConcurrentCache {
 		final float loadFactor;
 
 		final Queue<ReferenceEntry> recencyQueue = new ConcurrentLinkedQueue<ReferenceEntry>();
+		// accessQueue的大小应该与缓存的size一样大
 		final AccessQueue accessQueue = new AccessQueue();
 		final AtomicInteger readCount = new AtomicInteger();
 
@@ -375,6 +376,8 @@ public class ConcurrentCache {
 					e = new HashEntry(key, hash, first, value);
 					tab.set(index, e);
 					count = c; // write-volatile
+					
+					accessQueue.add(e);
 					recordAccess(e);
 				}
 
@@ -534,8 +537,11 @@ public class ConcurrentCache {
 					break;
 				}
 
-				// 注意：这里的无限循环
-				map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
+				if (map.isDebug){
+					// access
+					// 注意：这里的无限循环
+					map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
+				}
 
 				if (map.isDebug && accessQueue.size() != count) {
 					throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
@@ -564,13 +570,15 @@ public class ConcurrentCache {
 			HashEntry first = tab.get(index);
 
 			for (HashEntry e = first; e != null; e = e.next) {
-				if (e == entry) { // TODO 为啥这里不是根据key和hash进行判断？
+				if (e == entry) {
 					// 是否remove后面的，再remove前面的 access 是copied 的？
 					++modCount;
 					HashEntry newFirst = removeEntryFromChain(first, entry);
 					tab.set(index, newFirst);
 					count = c; // write-volatile
-					map.logger.debug("缓存[{}]被移除", entry.key);
+					if (map.isDebug){
+						map.logger.debug("缓存[{}]被移除", entry.key);
+					}
 					return;
 				}
 			}
@@ -793,7 +801,7 @@ public class ConcurrentCache {
 		return (V) segmentFor(hash).put(key, hash, value, false);
 	}
 
-	// TODO 临时方法
+	// TODO 临时方法 ,用于test测试
 	@SuppressWarnings("unchecked")
 	public <V extends AbsReference> V put(String key, AbsReference value) {
 		Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
@@ -1329,8 +1337,13 @@ public class ConcurrentCache {
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void consumeUpdateQueue(boolean doNow) {
-		logger.warn("缓存定时存储数据，队列大小：{}", updateQueue.size());
+		logger.warn("定时检测：缓存存储数据队列大小：{}", updateQueue.size());
 		if (doNow || updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
+			if (updateQueue.size() == 0){
+				return;
+			}
+			
+			logger.debug("缓存存储数据开始");
 			StopWatch watch = new Slf4JStopWatch();
 			CacheEntryInUpdateQueue wrapper = null;
 			while ((wrapper = updateQueue.poll()) != null) {
