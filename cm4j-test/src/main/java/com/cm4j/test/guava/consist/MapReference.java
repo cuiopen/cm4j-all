@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
 /**

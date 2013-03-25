@@ -27,7 +27,9 @@ import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
+import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.AbstractSequentialIterator;
 
 /**
@@ -59,10 +61,10 @@ public class ConcurrentCache {
 
 	/* ---------------- Constants -------------- */
 	// TODO 默认为16
-	static final int DEFAULT_INITIAL_CAPACITY = 1;
+	static final int DEFAULT_INITIAL_CAPACITY = 16;
 	static final float DEFAULT_LOAD_FACTOR = 0.75f;
 	// TODO 默认设为16
-	static final int DEFAULT_CONCURRENCY_LEVEL = 1;
+	static final int DEFAULT_CONCURRENCY_LEVEL = 2;
 	static final int MAXIMUM_CAPACITY = 1 << 30;
 	static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
 	static final int RETRIES_BEFORE_LOCK = 2;
@@ -73,7 +75,8 @@ public class ConcurrentCache {
 	/** 达到多少个对象，可持久化 */
 	static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
 	// TODO 默认过期纳秒，完成时需更改为较长时间过期
-	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(50);
+	// 50 用于并发测试
+	final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(10000);
 	// TODO debug模式
 	boolean isDebug = true;
 
@@ -376,7 +379,7 @@ public class ConcurrentCache {
 					e = new HashEntry(key, hash, first, value);
 					tab.set(index, e);
 					count = c; // write-volatile
-					
+
 					accessQueue.add(e);
 					recordAccess(e);
 				}
@@ -537,7 +540,7 @@ public class ConcurrentCache {
 					break;
 				}
 
-				if (map.isDebug){
+				if (map.isDebug) {
 					// access
 					// 注意：这里的无限循环
 					map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
@@ -576,7 +579,7 @@ public class ConcurrentCache {
 					HashEntry newFirst = removeEntryFromChain(first, entry);
 					tab.set(index, newFirst);
 					count = c; // write-volatile
-					if (map.isDebug){
+					if (map.isDebug) {
 						map.logger.debug("缓存[{}]被移除", entry.key);
 					}
 					return;
@@ -960,7 +963,8 @@ public class ConcurrentCache {
 	}
 
 	/**
-	 * 更改db状态并发送到更新队列，缓存不应直接调用此方法
+	 * 更改db状态并发送到更新队列，缓存不应直接调用此方法<br>
+	 * 注意：entry必须是在缓存中存在的，且entry.attachedKey都不能为null
 	 * 
 	 * @param entry
 	 * @param dbState
@@ -1308,6 +1312,7 @@ public class ConcurrentCache {
 	 * 关闭并写入db
 	 */
 	public void stop() {
+		Stopwatch watch = new Stopwatch().start();
 		stop.set(true);
 		Future<?> future = service.submit(new Runnable() {
 			@Override
@@ -1316,12 +1321,15 @@ public class ConcurrentCache {
 			}
 		});
 		try {
-			// 阻塞等待线程完成
-			future.get();
+			// 阻塞等待线程完成, 90s时间
+			future.get(90, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		service.shutdown();
+
+		watch.stop();
+		logger.debug("stop()运行时间:{}ms", watch.elapsedMillis());
 	}
 
 	/**
@@ -1337,12 +1345,12 @@ public class ConcurrentCache {
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void consumeUpdateQueue(boolean doNow) {
-		logger.warn("定时检测：缓存存储数据队列大小：{}", updateQueue.size());
+		logger.warn("定时检测：缓存存储数据队列大小：[{}]", updateQueue.size());
 		if (doNow || updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
-			if (updateQueue.size() == 0){
+			if (updateQueue.size() == 0) {
 				return;
 			}
-			
+
 			logger.debug("缓存存储数据开始");
 			StopWatch watch = new Slf4JStopWatch();
 			CacheEntryInUpdateQueue wrapper = null;
@@ -1351,13 +1359,9 @@ public class ConcurrentCache {
 				int num = reference.getNumInUpdateQueue().decrementAndGet();
 				// 删除或者更新的num为0
 				if (num == 0) {
-					// TODO 此时对象更改了怎么办？下面把他设成P，然后被删除了？
 					IEntity entity = wrapper.getEntity();
 					if (entity != null && DBState.P != wrapper.getDbState()) {
 						// TODO 发送db去批处理
-						// logger.debug(reference.getDbState() + " " +
-						// entity.toString());
-
 						HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 						if (DBState.U == wrapper.getDbState()) {
 							hibernate.saveOrUpdate(entity);

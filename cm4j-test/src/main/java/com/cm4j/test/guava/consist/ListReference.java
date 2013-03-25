@@ -1,10 +1,14 @@
 package com.cm4j.test.guava.consist;
 
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
 /**
@@ -14,16 +18,19 @@ import com.google.common.base.Preconditions;
  * @author Yang.hao
  * @since 2013-1-18 上午10:25:04
  * 
- * @param <E>
+ * @param <V>
  * @param <C>
  */
-public class ListReference<E extends CacheEntry> extends AbsReference {
-	private final CopyOnWriteArrayList<E> all_objects = new CopyOnWriteArrayList<E>();
+public class ListReference<V extends CacheEntry> extends AbsReference {
+	private final CopyOnWriteArraySet<V> all_objects = new CopyOnWriteArraySet<V>();
+	
+	// 用于存放暂时未被删除对象，里面对象只能被删除，不可更改状态
+	private final Set<V> deletedSet = new HashSet<V>();
 
 	/**
 	 * 初始化
 	 */
-	public ListReference(List<E> all_objects) {
+	public ListReference(List<V> all_objects) {
 		Preconditions.checkNotNull(all_objects);
 		this.all_objects.addAll(all_objects);
 	}
@@ -38,15 +45,16 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
-	public List<E> get() {
+	public Set<V> get() {
 		return all_objects;
 	}
 
 	/**
 	 * 新增或修改
 	 */
-	public void update(E e) {
+	public void update(V e) {
 		if (!all_objects.contains(e)) {
+			// 新增的
 			e.setAttachedKey(getAttachedKey());
 			all_objects.add(e);
 		}
@@ -56,11 +64,10 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	/**
 	 * 删除
 	 */
-	public void delete(E e) {
+	public void delete(V e) {
 		Preconditions.checkState(!all_objects.contains(e), "ListValue中不包含此对象，无法删除");
 		// 注意顺序，先remove再change
 		ConcurrentCache.getInstance().changeDbState(e, DBState.D);
-		all_objects.remove(e);
 	}
 
 	/*
@@ -69,7 +76,10 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 
 	@Override
 	protected boolean isAllPersist() {
-		for (E e : all_objects) {
+		if (deletedSet.size() > 0){
+			return false;
+		}
+		for (V e : all_objects) {
 			if (DBState.P != e.getDbState()) {
 				return false;
 			}
@@ -81,6 +91,13 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	@Override
 	protected void persistDB() {
 		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+		// 先deleteSet，后all_objects
+		// deleteSet数据处理
+		for (V v : deletedSet) {
+			hibernate.delete(v);
+		}
+		deletedSet.clear();
+		
 		for (CacheEntry entry : all_objects) {
 			if (DBState.P != entry.getDbState()) {
 				IEntity entity = entry.parseEntity();
@@ -97,9 +114,29 @@ public class ListReference<E extends CacheEntry> extends AbsReference {
 	}
 
 	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-		for (CacheEntry cacheEntry : all_objects) {
-			if (cacheEntry == entry) {
-				cacheEntry.changeDbState(dbState);
+		// deleteSet中如果为P，则从deleteSet中删除，以减少对象
+		Iterator<V> itor = deletedSet.iterator();
+		while (itor.hasNext()) {
+			V v = (V) itor.next();
+			// 进入deleteSet的对象只能被写入，
+			if (v == entry){
+				if (DBState.P != dbState){
+					throw new RuntimeException("对象被删除后不允许再修改");
+				} else {
+					itor.remove();
+					return true;
+				}
+			}
+		}
+		
+		for (V e : all_objects) {
+			if (e == entry) {
+				e.changeDbState(dbState);
+				
+				if (DBState.D == dbState){
+					this.deletedSet.add(e);
+					this.all_objects.remove(e);
+				}
 				return true;
 			}
 		}

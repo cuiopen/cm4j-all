@@ -49,10 +49,22 @@ public class SingleTest {
 
 	@Test
 	public void deleteTest() {
-		SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(3));
+		SingleReference<TestTable> reference = new TableIdCache(3).reference();
+		TestTable testTable = reference.get();
+		if (testTable == null) {
+			testTable = new TestTable(3, 3L);
+		}
+		reference.update(testTable);
 		reference.delete();
 
-		Assert.assertNull(ConcurrentCache.getInstance().get(new TableIdCache(3)).get());
+		// 这里应该报错，被删除了就不能被修改
+		boolean hasException = false;
+		try {
+			reference.update(testTable);
+		} catch (Exception e) {
+			hasException = true;
+		}
+		Assert.assertTrue(hasException);
 	}
 
 	@Test

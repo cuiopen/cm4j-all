@@ -5,12 +5,12 @@ import java.util.List;
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.ServiceManager;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
 import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
+import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
 public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndNameVO>> {
