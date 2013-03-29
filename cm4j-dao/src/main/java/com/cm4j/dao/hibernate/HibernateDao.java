@@ -14,6 +14,7 @@ import org.hibernate.HibernateException;
 import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -741,11 +742,103 @@ public class HibernateDao<E, ID extends Serializable> implements InitializingBea
 	}
 
 	/**
+	 * @author Yang.hao
+	 * @since 2013-3-29 上午09:45:45
+	 * 
+	 * @param <E>
+	 */
+	public static class BatchWrapper<E> {
+		public static final int UPDATE = 1, DELETE = 2;
+		private final E e;
+		private final int type;
+
+		public BatchWrapper(E e, int type) {
+			super();
+			this.e = e;
+			this.type = type;
+		}
+
+		public E getE() {
+			return e;
+		}
+
+		public int getType() {
+			return type;
+		}
+	}
+
+	/**
+	 * 批量保存/更新
+	 * 
+	 * @param entities
+	 */
+	public void batchSaveOrUpdate(Collection<BatchWrapper<E>> entities, BatchCallback<E> callback) {
+		Session session = getSession();
+		Transaction tx = session.beginTransaction();
+		try {
+			int idx = 0;
+			for (BatchWrapper<E> entry : entities) {
+				E e = entry.getE();
+				int type = entry.getType();
+
+				if (BatchWrapper.UPDATE == type) {
+					session.merge(e);
+				} else if (BatchWrapper.DELETE == type) {
+					session.delete(e);
+				}
+				if ((++idx) % 50 == 0) {
+					session.flush(); // 清理缓存，执行批量插入20条记录的SQL insert语句
+					session.clear(); // 清空缓存中的Customer对象
+				}
+			}
+			tx.commit();
+			if (callback != null) {
+				for (BatchWrapper<E> entry : entities) {
+					E e = entry.getE();
+					callback.doAfterUpdate(e);
+				}
+			}
+		} catch (HibernateException exception) {
+			tx.rollback();
+			logger.error("批处理异常", exception);
+			for (BatchWrapper<E> entry : entities) {
+				E e = entry.getE();
+				int type = entry.getType();
+				try {
+					if (BatchWrapper.UPDATE == type) {
+						hibernateTemplate.saveOrUpdate(e);
+					} else if (BatchWrapper.DELETE == type) {
+						hibernateTemplate.delete(e);
+					}
+					if (callback != null) {
+						callback.doAfterUpdate(e);
+					}
+				} catch (DataAccessException e1) {
+					logger.error("批处理失败，单条更新失败", e1);
+				}
+			}
+		} finally {
+			try {
+				session.close();
+			} catch (HibernateException e) {
+				logger.error("批处理失败session.close()异常", e);
+			}
+		}
+	}
+
+	public interface BatchCallback<E> {
+		/**
+		 * 更新成功后回调
+		 */
+		public void doAfterUpdate(E e);
+	}
+
+	/**
 	 * spring中HibernateDaoSupport中提供的getSession方法
 	 * 
 	 * @return
 	 */
-	protected Session getSession() throws DataAccessResourceFailureException, IllegalStateException {
+	public Session getSession() throws DataAccessResourceFailureException, IllegalStateException {
 		boolean allowCreate = hibernateTemplate.isAllowCreate();
 		return (!allowCreate ? SessionFactoryUtils.getSession(getSessionFactory(), false) : SessionFactoryUtils
 				.getSession(getSessionFactory(), this.hibernateTemplate.getEntityInterceptor(),

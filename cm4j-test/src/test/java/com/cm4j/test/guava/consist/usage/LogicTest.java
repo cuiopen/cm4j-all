@@ -46,7 +46,7 @@ public class LogicTest {
 	@Test
 	public void ccTest() {
 		SingleReference<TestTable> reference = new TableIdCache(5).reference();
-		reference.update(new TestTable(6, 7L));
+		reference.update(new TestTable(101, 7L));
 		reference.update(new TestTable(6, 8L));
 		reference.persistAndRemove();
 	}

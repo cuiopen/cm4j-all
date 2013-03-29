@@ -14,7 +14,6 @@ public class Manager extends Employee {
 
 	@Override
 	public void accept(IVisitor visitor) {
-		// TODO Auto-generated method stub
 		
 	}
 	

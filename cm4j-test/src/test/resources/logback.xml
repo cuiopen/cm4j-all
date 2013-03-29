@@ -27,6 +27,10 @@
 		</encoder>
 	</appender>
 	
+	<logger name="com.cm4j.dao.hibernate">
+		<level value="debug" />
+		<appender-ref ref="STDOUT" />
+	</logger>
 	<logger name="com.cm4j.test">
 		<level value="debug" />
 		<appender-ref ref="STDOUT" />
