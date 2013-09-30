@@ -15,8 +15,8 @@ public class LongConnectClientTest {
 
 		for (int i = 0; i < 100000; i++) {
 //			param.setAccountId(100000 + i);
-//			ConstructedMessage protocol = ProtocolFactory.Holder.instance.createProtocol();
-
+//			ConstructedMessage protocol = ((Object) ProtocolFactory.Holder.instance).createProtocol();
+//
 //			client.sendProtocol(protocol);
 		}
 

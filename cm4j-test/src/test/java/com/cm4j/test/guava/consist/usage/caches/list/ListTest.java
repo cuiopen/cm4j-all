@@ -56,7 +56,7 @@ public class ListTest {
 
 	@Test
 	public void changeTest2() {
-		ListReference<TestTable> reference = new TableValueListCache(6).reference();
+		ListReference<TestTable> reference = new TableValueListCache(6).ref();
 		TestTable table = new TableValueListCache(6).findById(4);
 		reference.update(table);
 

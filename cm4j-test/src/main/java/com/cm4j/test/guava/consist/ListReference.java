@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
  */
 public class ListReference<V extends CacheEntry> extends AbsReference {
 	private final CopyOnWriteArraySet<V> all_objects = new CopyOnWriteArraySet<V>();
-	
+
 	// 用于存放暂时未被删除对象，里面对象只能被删除，不可更改状态
 	private final Set<V> deletedSet = new HashSet<V>();
 
@@ -52,20 +52,20 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 	/**
 	 * 新增或修改
 	 */
-	public void update(V e) {
-		if (!all_objects.contains(e)) {
+	public void update(V v) {
+		if (!all_objects.contains(v)) {
 			// 新增的
-			e.setAttachedKey(getAttachedKey());
-			all_objects.add(e);
+			v.resetRef(this);
+			all_objects.add(v);
 		}
-		ConcurrentCache.getInstance().changeDbState(e, DBState.U);
+		ConcurrentCache.getInstance().changeDbState(v, DBState.U);
 	}
 
 	/**
 	 * 删除
 	 */
 	public void delete(V e) {
-		Preconditions.checkState(!all_objects.contains(e), "ListValue中不包含此对象，无法删除");
+		Preconditions.checkState(all_objects.contains(e), "ListValue中不包含此对象，无法删除");
 		// 注意顺序，先remove再change
 		ConcurrentCache.getInstance().changeDbState(e, DBState.D);
 	}
@@ -75,8 +75,22 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 	 */
 
 	@Override
+	protected void updateEntry(CacheEntry e) {
+		@SuppressWarnings("unchecked")
+		V v = (V) e;
+		this.update(v);
+	}
+
+	@Override
+	protected void deleteEntry(CacheEntry e) {
+		@SuppressWarnings("unchecked")
+		V v = (V) e;
+		this.delete(v);
+	}
+
+	@Override
 	protected boolean isAllPersist() {
-		if (deletedSet.size() > 0){
+		if (deletedSet.size() > 0) {
 			return false;
 		}
 		for (V e : all_objects) {
@@ -97,7 +111,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 			hibernate.delete(v);
 		}
 		deletedSet.clear();
-		
+
 		for (CacheEntry entry : all_objects) {
 			if (DBState.P != entry.getDbState()) {
 				IEntity entity = entry.parseEntity();
@@ -113,27 +127,25 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 		}
 	}
 
+	@Override
 	protected boolean changeDbState(CacheEntry entry, DBState dbState) {
 		// deleteSet中如果为P，则从deleteSet中删除，以减少对象
 		Iterator<V> itor = deletedSet.iterator();
 		while (itor.hasNext()) {
 			V v = (V) itor.next();
 			// 进入deleteSet的对象只能被写入，
-			if (v == entry){
-				if (DBState.P != dbState){
-					throw new RuntimeException("对象被删除后不允许再修改");
-				} else {
-					itor.remove();
-					return true;
-				}
+			if (v == entry) {
+				Preconditions.checkArgument(DBState.P == dbState, "对象被删除后不允许再修改");
+				itor.remove();
+				return true;
 			}
 		}
-		
+
 		for (V e : all_objects) {
 			if (e == entry) {
 				e.changeDbState(dbState);
-				
-				if (DBState.D == dbState){
+
+				if (DBState.D == dbState) {
 					this.deletedSet.add(e);
 					this.all_objects.remove(e);
 				}
@@ -146,7 +158,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 	@Override
 	protected void attachedKey(String attachedKey) {
 		for (CacheEntry v : all_objects) {
-			v.setAttachedKey(getAttachedKey());
+			v.resetRef(this);
 		}
 	}
 }

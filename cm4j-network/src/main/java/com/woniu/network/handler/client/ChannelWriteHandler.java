@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.woniu.network.bootstrap.client.AbstractClient;
-import com.woniu.network.protocol.ConstructedMessage;
 import com.woniu.network.protocol.IProtocol;
 
 /**

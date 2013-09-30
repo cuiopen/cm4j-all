@@ -13,7 +13,7 @@ import com.google.common.cache.Weigher;
 public class GuavaCacheTest {
 
 	private static final LoadingCache<String, String> cache = CacheBuilder.newBuilder()
-			.expireAfterWrite(500, TimeUnit.SECONDS).removalListener(new RemovalListener<String, String>() {
+			.expireAfterWrite(5, TimeUnit.SECONDS).removalListener(new RemovalListener<String, String>() {
 
 				@Override
 				public void onRemoval(RemovalNotification<String, String> event) {
@@ -39,17 +39,13 @@ public class GuavaCacheTest {
 		System.out.println(cache.getIfPresent("ccd"));
 
 //		new Thread(new T()).start();
-		System.out.println(cache.get("ccd"));
-		System.out.println(cache.get("ccd"));
 
 		cache.put("ccd", "def");
-		cache.put("ccd", "xyz");
-		
 		System.out.println(cache.get("ccd"));
+		cache.put("ccd", "123");
 		System.out.println(cache.stats());
 		
 		System.out.println(63 & 65);
-
 	}
 
 	static class T implements Runnable {

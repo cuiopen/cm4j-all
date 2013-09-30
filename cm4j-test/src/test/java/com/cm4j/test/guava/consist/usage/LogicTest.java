@@ -35,7 +35,7 @@ public class LogicTest {
 	 */
 	@Test
 	public void normal() {
-		SingleReference<TestTable> reference = new TableIdCache(5).reference();
+		SingleReference<TestTable> reference = new TableIdCache(5).ref();
 		TestTable testTable = reference.get();
 		testTable.setNValue(1L);
 		reference.update(testTable);
@@ -45,7 +45,7 @@ public class LogicTest {
 
 	@Test
 	public void ccTest() {
-		SingleReference<TestTable> reference = new TableIdCache(5).reference();
+		SingleReference<TestTable> reference = new TableIdCache(5).ref();
 		reference.update(new TestTable(101, 7L));
 		reference.update(new TestTable(6, 8L));
 		reference.persistAndRemove();

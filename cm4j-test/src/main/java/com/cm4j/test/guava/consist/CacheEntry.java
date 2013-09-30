@@ -1,8 +1,12 @@
 package com.cm4j.test.guava.consist;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.consist.keys.Identity;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 /**
  * 单个缓存值，例如数据库中的一行数据<br>
@@ -26,10 +30,22 @@ public abstract class CacheEntry {
 	/**
 	 * 此对象所依附的key
 	 */
-	private String attachedKey;
+	private AbsReference ref;
 
-	AtomicInteger getNumInUpdateQueue() {
-		return numInUpdateQueue;
+	/**
+	 * 更新此对象
+	 */
+	public void update() {
+		Preconditions.checkNotNull(this.ref);
+		this.ref.updateEntry(this);
+	}
+
+	/**
+	 * 删除此对象
+	 */
+	public void delete() {
+		Preconditions.checkNotNull(this.ref);
+		this.ref.deleteEntry(this);
 	}
 
 	/**
@@ -41,13 +57,56 @@ public abstract class CacheEntry {
 	 */
 	public abstract IEntity parseEntity();
 
-	public String getAttachedKey() {
-		return attachedKey;
+	/**
+	 * 修改Entry状态且不为P的时候发送给更新队列
+	 * 
+	 * @param dbState
+	 *            <font color=red>如果为P，则不发送到更新队列</font>
+	 */
+	protected void changeDbState(DBState dbState) {
+		setDbState(dbState);
+		if (DBState.P != dbState) {
+			ConcurrentCache.getInstance().sendToUpdateQueue(this);
+		}
 	}
 
-	public void setAttachedKey(String attachedKey) {
-		this.attachedKey = attachedKey;
+	/**
+	 * 由子类覆盖
+	 * 
+	 * @return
+	 */
+	protected Object getIdentity() {
+		return null;
 	}
+
+	/**
+	 * 唯一标识的数值 1.子类覆写 {@link #getIdentity()} 2.子类实现标识注解ID在字段上
+	 */
+	public Object getID() {
+		Object result = getIdentity();
+		if (result != null) {
+			return result;
+		}
+		Method[] methods = this.getClass().getDeclaredMethods();
+		for (Method method : methods) {
+			if (method.isAnnotationPresent(Identity.class)) {
+				try {
+					result = method.invoke(this);
+					if (result != null) {
+						return result;
+					}
+				} catch (Exception e) {
+					// 获取CacheEntry.ID异常
+					Throwables.propagate(e);
+				}
+			}
+		}
+		throw new RuntimeException("CacheEntry的标识不能为空");
+	}
+
+	/*
+	 * ==================== getter and setter ===================
+	 */
 
 	public DBState getDbState() {
 		return dbState;
@@ -57,10 +116,15 @@ public abstract class CacheEntry {
 		this.dbState = dbState;
 	}
 
-	protected void changeDbState(DBState dbState) {
-		setDbState(dbState);
-		if (DBState.P != dbState) {
-			ConcurrentCache.getInstance().sendToUpdateQueue(this);
-		}
+	AtomicInteger getNumInUpdateQueue() {
+		return numInUpdateQueue;
+	}
+
+	public AbsReference ref() {
+		return this.ref;
+	}
+
+	public void resetRef(AbsReference ref) {
+		this.ref = ref;
 	}
 }

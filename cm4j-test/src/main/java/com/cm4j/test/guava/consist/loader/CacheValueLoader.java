@@ -5,6 +5,7 @@ import org.apache.commons.lang.ArrayUtils;
 import com.cm4j.test.guava.consist.AbsReference;
 import com.cm4j.test.guava.consist.keys.KEYS;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 /**
  * 缓存值加载
@@ -15,6 +16,7 @@ import com.google.common.base.Preconditions;
  */
 public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	public AbsReference load(String key) throws RuntimeException {
 		String[] keyInfo = KEYS.getKeyInfo(key);
@@ -24,8 +26,24 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 		PrefixMappping mappping = PrefixMappping.valueOf(prefix);
 		Preconditions.checkNotNull(mappping);
 
-		// 这里配的是无参数对象
-		CacheDescriptor<? extends AbsReference> desc = mappping.getCacheDesc();
-		return desc.load(params);
+		try {
+			// 这里配的是无参数对象
+			Class<? extends CacheDescriptor<?>> clazz = mappping.getCacheDesc();
+			CacheDescriptor desc = clazz.newInstance();
+			
+			AbsReference result = desc.load(params);
+			Preconditions.checkNotNull(result);
+			return result;
+		} catch (Exception e) {
+			throw Throwables.propagate(e);
+		}
+	}
+
+	/**
+	 * 占位符，表明null值
+	 */
+	public static final NULL NULL_PH = new NULL();
+
+	public static class NULL {
 	}
 }

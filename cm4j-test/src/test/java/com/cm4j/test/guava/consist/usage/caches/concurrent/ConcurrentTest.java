@@ -1,17 +1,16 @@
 package com.cm4j.test.guava.consist.usage.caches.concurrent;
 
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-
+import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.entity.TestTable;
+import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 /**
  * 并发测试
@@ -56,7 +55,7 @@ public class ConcurrentTest {
 			try {
 				barrier.await();
 				for (int i = 0; i < 20000; i++) {
-					SingleReference<TestTable> reference = new TableIdCache(1).reference();
+					SingleReference<TestTable> reference = new TableIdCache(1).ref();
 					reference.get().increaseValue();
 					reference.update(reference.get());
 					// 为增加并发异常，暂停100ms

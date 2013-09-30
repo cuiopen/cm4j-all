@@ -32,6 +32,7 @@ public class LockTest {
 
 		LockTest tester = new LockTest();
 
+
 		// 测试可重入，函数testReentry() 执行获取锁后，显示信息的功能
 		tester.testReentry();
 		// 能执行到这里而不阻塞，表示锁可重入
@@ -42,10 +43,10 @@ public class LockTest {
 		// 释放重入测试的锁，要按重入的数量解锁，否则其他线程无法获取该锁。
 		tester.getLock().unlock();
 		tester.getLock().unlock();
-		tester.getLock().unlock();
+        tester.getLock().unlock();
 
-		// 启动3个线程测试在锁保护下的共享数据data的访问
-		tester.test();
+        // 启动3个线程测试在锁保护下的共享数据data的访问
+        tester.test();
 	}
 
 	public ReentrantLock getLock() {

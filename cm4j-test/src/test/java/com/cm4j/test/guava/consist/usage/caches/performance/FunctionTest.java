@@ -14,8 +14,8 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
+import com.cm4j.test.guava.consist.entity.TmpFhhd;
+import com.cm4j.test.guava.consist.usage.caches.cc.TmpFhhdCache;
 
 /**
  * 多线程异步短时间过期+写入测试
@@ -45,9 +45,12 @@ public class FunctionTest {
 
 		ConcurrentCache.getInstance().stop();
 
+		long writeEnd = System.nanoTime();
+
 		System.out.println("======================");
-		System.out.println("完成，总运行个数：" + counter.get());
-		System.out.println((double) (end - start) / 1000000000);
+		System.out.println("完成，数值sum为：" + counter.get());
+		System.out.println("计算消耗时间：" + (double) (end - start) / 1000000000);
+		System.out.println("写入消耗时间：" + (double) (writeEnd - end) / 1000000000);
 	}
 
 	public class randomThread implements Runnable {
@@ -63,37 +66,50 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 2000; i++) { // 执行20000次
-					int random = 0;
-					while (random < 100) {
-						random = RandomUtils.nextInt(1000);
-					}
-					if (random >= 100) {
-						SingleReference<TestTable> reference = new TableIdCache(random).reference();
+				for (int i = 0; i < 5000; i++) { // 执行20000次
+					try {
+						int random = RandomUtils.nextInt(1000);
 
 						synchronized (counter) {
-							TestTable testTable = reference.get();
-							if (testTable == null) {
-								reference.update(new TestTable(random, 1L));
+							SingleReference<TmpFhhd> ref = new TmpFhhdCache(random).ref();
+
+							TmpFhhd fhhd = ref.get();
+							if (fhhd == null) {
 								long num = counter.incrementAndGet();
-								// logger.debug("new 新对象,总计 = {}",num);
+								
+								ref.update(new TmpFhhd(random, 1, 1, ""));
+								ref.persist();
+
+								// logger.debug("new 新对象{},总计 = {}", random,
+								// num);
 							} else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0.8) {
-									testTable.increaseValue();
-									reference.update(testTable);
+								if (d >= 0) {
 									long num = counter.incrementAndGet();
-									// logger.debug("对象+1,总计 = {}", num);
+									
+									fhhd.increaseValue();
+									fhhd.update();
+
+									// todo 有新增或删除的persist为嘛会报错？？？
+									ref.persist();
+
+									// logger.debug("对象{} +1,总计 = {}", random,
+									// num);
 								} else {
-									reference.delete();
-									counter.addAndGet(-testTable.getNValue());
-									// logger.debug("对象 {} 被删除",testTable.getNId());
+									counter.addAndGet(-fhhd.getNCurToken());
+
+									fhhd.delete();
+									ref.persist();
+
+//									logger.debug("对象 {} 被删除", fhhd.getNPlayerId());
 								}
 							}
 						}
 
-						// 为增加并发异常，暂停50ms
+						// 为增加并发异常，暂停10ms
 						// Thread.sleep(10);
+					} catch (Exception e) {
+						logger.error("THREAD ERROR[" + Thread.currentThread().getName() + "]", e);
 					}
 				}
 				barrier.await();

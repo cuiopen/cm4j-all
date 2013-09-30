@@ -1,15 +1,20 @@
 package com.cm4j.test.guava.consist.usage.caches.single;
 
+import org.hibernate.HibernateException;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
+import com.cm4j.test.guava.consist.entity.TmpFhhd;
+import com.cm4j.test.guava.consist.usage.caches.cc.TmpFhhdCache;
+import com.cm4j.test.guava.service.ServiceManager;
 
 /**
  * 
@@ -22,45 +27,37 @@ import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
 public class SingleTest {
 
 	@Test
-	public void getTest() {
-		TestTable table = ConcurrentCache.getInstance().get(new TableIdCache(9999)).get();
-		TestTable table2 = new TableIdCache(9999).reference().get();
+	public void getTest() throws Exception {
+		TmpFhhd fhhd = ConcurrentCache.getInstance().get(new TmpFhhdCache(50769)).get();
+		TmpFhhd fhhd2 = new TmpFhhdCache(50769).ref().get();
 
-		Assert.assertTrue(table == table2);
-	}
-
-	@Test
-	public void saveOrUpdateTest() {
-		SingleReference<TestTable> reference = ConcurrentCache.getInstance().get(new TableIdCache(3));
-		TestTable testTable = reference.get();
-
-		long old = 0;
-		if (testTable == null) {
-			// 新增时要注意：键要一致，要保证再从db查询新增的仍然能查询到
-			testTable = new TestTable(3, (long) 1);
-		} else {
-			old = testTable.getNValue();
-			testTable.setNValue(testTable.getNValue() + 1);
-		}
-		reference.update(testTable);
-
-		Assert.assertEquals(old + 1, new TableIdCache(3).reference().get().getNValue().longValue());
+		Assert.assertTrue(fhhd == fhhd2);
 	}
 
 	@Test
 	public void deleteTest() {
-		SingleReference<TestTable> reference = new TableIdCache(3).reference();
-		TestTable testTable = reference.get();
-		if (testTable == null) {
-			testTable = new TestTable(3, 3L);
-		}
-		reference.update(testTable);
-		reference.delete();
+		new TmpFhhdCache(50769).ref().delete();
+		new TmpFhhdCache(50769).ref().persist();
+	}
+	
+	@Test
+	public void deleteTest2(){
+		new TmpFhhdCache(50769).ref().get().delete();
+		new TmpFhhdCache(50769).ref().persist();
+	}
+
+	@Test
+	public void deleteTest3() {
+		SingleReference<TmpFhhd> ref = new TmpFhhdCache(50769).ref();
+		TmpFhhd tmpFhhd = ref.get();
+
+		// 删除
+		ref.delete();
 
 		// 这里应该报错，被删除了就不能被修改
 		boolean hasException = false;
 		try {
-			reference.update(testTable);
+			ref.update(tmpFhhd);
 		} catch (Exception e) {
 			hasException = true;
 		}
@@ -68,30 +65,81 @@ public class SingleTest {
 	}
 
 	@Test
-	public void multiTableGetTest() {
-		TableAndNameVO tableAndName = ConcurrentCache.getInstance().get(new TableAndNameCache(1)).get();
-		Assert.assertNotNull(tableAndName.getName());
+	public void addTest() {
+		// 新增，如果有记录则不能add new出来的对象，因为对象已经存在，请更新
+		new TmpFhhdCache(50769).ref().update(new TmpFhhd(50769, 10, 10, ""));
+		new TmpFhhdCache(50769).ref().persist();
 	}
 
 	@Test
+	public void updateTest() {
+		TmpFhhd fhhd = new TmpFhhdCache(50769).ref().get();
+		long old = fhhd.getNCurToken();
+		fhhd.setNCurToken((int) (old + 1));
+		fhhd.update();
+
+		new TmpFhhdCache(50769).ref().persist();
+
+		Assert.assertEquals(old + 1, new TmpFhhdCache(50769).ref().get().getNCurToken().intValue());
+	}
+
+	@Test
+	public void refreshTest() {
+		TmpFhhd fhhd = ConcurrentCache.getInstance().get(new TmpFhhdCache(50769)).get();
+		TmpFhhd fhhd2 = new TmpFhhdCache(50769).refresh().get();
+
+		Assert.assertTrue(fhhd != fhhd2);
+	}
+	
+	@Test
 	public void persistAndRemove() {
-		SingleReference<TestTable> reference = new TableIdCache(5).reference();
-		TestTable testTable = reference.get();
-		testTable.setNValue(1L);
-		reference.update(testTable);
-		reference.persist();
+		TmpFhhd fhhd = new TmpFhhdCache(50769).ref().get();
+		fhhd.setNCurToken(1);
+		fhhd.update();
+		new TmpFhhdCache(50769).ref().persist();
 
 		// 存在缓存
-		Assert.assertEquals(1L, new TableIdCache(5).referenceIfPresent().get().getNValue().longValue());
+		Assert.assertEquals(1, new TmpFhhdCache(50769).refIfPresent().get().getNCurToken().intValue());
 
-		reference.persistAndRemove();
-		testTable.setNValue(2L);
-		reference.update(testTable);
-		reference.persistAndRemove();
+		fhhd.setNCurToken(2);
+		fhhd.update();
+		new TmpFhhdCache(50769).ref().persistAndRemove();
 
 		// 不存在缓存
-		Assert.assertNull(new TableIdCache(5).referenceIfPresent());
+		Assert.assertNull(new TmpFhhdCache(50769).refIfPresent());
 		// 数值已更改
-		Assert.assertEquals(2L, new TableIdCache(5).reference().get().getNValue().longValue());
+		Assert.assertEquals(2, new TmpFhhdCache(50769).ref().get().getNCurToken().intValue());
+	}
+	
+	@Test
+	public void tt(){
+		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+		Session session = hibernate.getSession();
+		Transaction tx = session.beginTransaction();
+		try {
+			session.merge(new TmpFhhd(1, 1, 3, ""));
+			session.merge(new TmpFhhd(1, 3, 3, ""));
+			
+			session.flush(); // 清理缓存，执行批量插入20条记录的SQL insert语句
+			session.clear(); // 清空缓存中的Customer对象
+			
+			// 提交
+			tx.commit();
+		} catch (HibernateException exception) {
+			exception.printStackTrace();
+		} finally {
+			try {
+				session.close();
+			} catch (HibernateException e) {
+			}
+		}
+		
+//		SingleReference<TmpFhhd> ref = new TmpFhhdCache(1).ref();
+//		ref.update(new TmpFhhd(1, 1, 3, ""));
+//		
+//		SingleReference<TmpFhhd> ref2 = new TmpFhhdCache(1).ref();
+//		
+//		ref2.update(new TmpFhhd(1, 1, 3, ""));
+//		ref2.persist();
 	}
 }

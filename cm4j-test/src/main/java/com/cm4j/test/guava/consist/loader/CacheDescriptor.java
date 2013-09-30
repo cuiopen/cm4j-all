@@ -2,6 +2,7 @@ package com.cm4j.test.guava.consist.loader;
 
 import com.cm4j.test.guava.consist.AbsReference;
 import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.keys.KEYS;
 import com.cm4j.test.guava.consist.keys.KEYS.JOINER;
 import com.google.common.base.Preconditions;
 
@@ -16,11 +17,17 @@ public abstract class CacheDescriptor<V extends AbsReference> {
 
 	private Object[] params;
 
+	protected CacheDescriptor() {
+	}
+	
 	/**
 	 * 子类可调用本方法，用可变数值做参数<br>
 	 * 或者新建一个无参构造函数用于{@link PrefixMappping}映射，有参构造函数则指明具体参数类型
 	 */
 	protected CacheDescriptor(Object... params) {
+		for (Object param : params) {
+			KEYS.checkParam(param);
+		}
 		this.params = params;
 	}
 
@@ -34,7 +41,6 @@ public abstract class CacheDescriptor<V extends AbsReference> {
 	public abstract V load(String... params);
 
 	public String getKey() {
-		Preconditions.checkArgument(params.length > 0, "CacheDescriptor参数不能为0");
 		PrefixMappping mapping = PrefixMappping.getMapping(this);
 		Preconditions.checkNotNull(mapping, "此缓存未在PrefixMappping进行映射：" + this.getClass().getSimpleName());
 		return new JOINER(mapping.name(), params).key();
@@ -45,11 +51,20 @@ public abstract class CacheDescriptor<V extends AbsReference> {
 	 * 
 	 * @return
 	 */
-	public V reference() {
+	public V ref() {
 		return ConcurrentCache.getInstance().get(this);
 	}
-	
-	public V referenceIfPresent(){
+
+	public V refIfPresent() {
 		return ConcurrentCache.getInstance().getIfPresent(this);
+	}
+
+	/**
+	 * 忽略之前的数值重新加载DB中的最新值
+	 * 
+	 * @return
+	 */
+	public V refresh() {
+		return ConcurrentCache.getInstance().refresh(this);
 	}
 }

@@ -1,8 +1,8 @@
 package com.cm4j.test.thread.concurrent.coordination.countdown_barrier;
 
-import java.util.concurrent.CountDownLatch;
-
 import org.junit.Test;
+
+import java.util.concurrent.CountDownLatch;
 
 public class CountDownLatchUsage {
 

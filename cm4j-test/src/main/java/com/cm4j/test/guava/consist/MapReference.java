@@ -43,7 +43,7 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
 
 	public void put(K key, V value) {
 		if (!map.containsKey(key)) {
-			value.setAttachedKey(getAttachedKey());
+			value.resetRef(this);
 			map.put(key, value);
 		}
 		ConcurrentCache.getInstance().changeDbState(value, DBState.U);
@@ -60,7 +60,19 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
 	/*
 	 * ================== extend methods ====================
 	 */
-
+	
+	@Override
+	protected void updateEntry(CacheEntry e) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	@Override
+	protected void deleteEntry(CacheEntry e) {
+		// TODO Auto-generated method stub
+		
+	}
+	
 	@Override
 	protected boolean isAllPersist() {
 		for (V e : map.values()) {
@@ -104,7 +116,7 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
 	@Override
 	protected void attachedKey(String attachedKey) {
 		for (CacheEntry v : map.values()) {
-			v.setAttachedKey(getAttachedKey());
+			v.resetRef(this);
 		}
 	}
 }

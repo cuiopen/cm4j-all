@@ -23,6 +23,22 @@ public abstract class AbsReference {
 	public abstract <V> V get();
 
 	/**
+	 * 更新entry<br>
+	 * 因为子类有范型，类型兼容问题，所以子类多写一个update()方法来规定对象给外部调用，而此方法也转类型调用update()
+	 * 
+	 * @param e
+	 */
+	protected abstract void updateEntry(CacheEntry e);
+
+	/**
+	 * 删除entry<br>
+	 * 因为子类有范型，类型兼容问题，所以子类多写一个delete()方法来规定对象给外部调用，而此方法也转类型调用update()
+	 * 
+	 * @param e
+	 */
+	protected abstract void deleteEntry(CacheEntry e);
+
+	/**
 	 * 是否所有对象都与数据库保持一致，缓存过期是否可移除的判断条件之一，此方法在lock下被调用<br>
 	 * 
 	 * @return
@@ -51,7 +67,7 @@ public abstract class AbsReference {
 	protected abstract void attachedKey(String attachedKey);
 
 	/**
-	 * 持久化
+	 * 持久化但不移除
 	 */
 	public void persist() {
 		ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), false);
@@ -70,6 +86,6 @@ public abstract class AbsReference {
 
 	protected void setAttachedKey(String attachedKey) {
 		this.attachedKey = attachedKey;
-	};
-
+		attachedKey(attachedKey);
+	}
 }

@@ -22,7 +22,8 @@
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<!-- encoders are assigned by default the type ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
 		<encoder>
-			<pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] [%file:%line] \t- %msg%n</pattern>
+			<pattern>%d{MM:dd HH:mm:ss} [%file:%line] - %msg%n</pattern>
+			<!-- <pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] [%file:%line] \t- %msg%n</pattern> -->
 			<!-- <pattern>%d{MM:dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}\t- %msg%n</pattern> -->
 		</encoder>
 	</appender>
@@ -67,7 +68,7 @@
 
 	<!--org.perf4j.TimingLogger是StopWath的日志名，additivity false表示只写到perf4j文件 -->
 	<logger name="org.perf4j.TimingLogger" additivity="false">
-		<level value="DEBUG" />
+		<level value="INFO" />
 		<appender-ref ref="perf4j" />
 	</logger>
 	

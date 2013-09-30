@@ -5,6 +5,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 /**
  * 缓存key
@@ -34,6 +35,20 @@ public abstract class KEYS {
 		@Override
 		public String key() {
 			return this.key;
+		}
+	}
+
+	/**
+	 * 指定参数必须为一定的类型
+	 * 
+	 * @param param
+	 */
+	public static void checkParam(Object param) {
+		try {
+			Preconditions.checkArgument(param instanceof String || param instanceof Number || param instanceof Boolean
+					|| param instanceof Character || param == null, "参数必须是java基础类型");
+		} catch (Exception e) {
+			Throwables.propagate(e);
 		}
 	}
 }

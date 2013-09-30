@@ -39,6 +39,23 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 	}
 
 	/**
+	 * 新增或修改<br>
+	 * 注意：修改的对象必须是 {@link SingleReference#v} 被删除的对象不允许再被修改
+	 */
+	public void update(V v) {
+		Preconditions.checkNotNull(v);
+		if (this.v == null) {
+			// 代表v是新增的
+			v.resetRef(this);
+		} else if (this.v != v) {
+			// 已存在对象且对象不一致
+			throw new RuntimeException("SingleReference中对象已存在，不允许修改其他对象");
+		}
+		this.v = v;
+		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
+	}
+
+	/**
 	 * 从db删除，而不是移除缓存
 	 */
 	public void delete() {
@@ -48,30 +65,27 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 		ConcurrentCache.getInstance().changeDbState(this.v, DBState.D);
 	}
 
-	/**
-	 * 新增或修改<br>
-	 * 注意：修改的对象必须是 {@link SingleReference#v}
-	 * 被删除的对象不允许再被修改
-	 */
-	public void update(V v) {
-		Preconditions.checkNotNull(v);
-		if (this.v == null) {
-			// 代表v是新增的
-			v.setAttachedKey(getAttachedKey());
-		} else if (this.v != v) {
-			// 已存在对象且对象不一致
-			throw new RuntimeException("SingleReference中对象已存在，不允许修改其他对象");
-		}
-		this.v = v;
-		ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
-	}
-
 	/*
 	 * ================== extend methods under lock ====================
 	 */
 	@Override
+	protected void updateEntry(CacheEntry e) {
+		@SuppressWarnings("unchecked")
+		V v = (V) e;
+		this.update(v);
+	}
+
+	@Override
+	protected void deleteEntry(CacheEntry e) {
+		@SuppressWarnings("unchecked")
+		V v = (V) e;
+		Preconditions.checkArgument(this.v == v);
+		this.delete();
+	}
+
+	@Override
 	protected boolean isAllPersist() {
-		if (deletedSet.size() > 0){
+		if (deletedSet.size() > 0) {
 			return false;
 		}
 		if (this.v != null && DBState.P != this.v.getDbState()) {
@@ -87,20 +101,27 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 		// deleteSet数据处理
 		for (V v : deletedSet) {
 			hibernate.delete(v);
+			changeDbState(v, DBState.P);
+			// entry.setDbState(DBState.P);
+			// 占位：发送到更新队列，状态P
+			ConcurrentCache.getInstance().sendToUpdateQueue(v);
 		}
 		deletedSet.clear();
 
 		// v数据处理
-		CacheEntry entry = this.v;
-		IEntity entity = entry.parseEntity();
-		if (DBState.U == entry.getDbState()) {
-			hibernate.saveOrUpdate(entity);
-		} else if (DBState.D == entry.getDbState()) {
-			hibernate.delete(entity);
+		// 有可能对象被删除到deletedSet，entry则为null
+		if (this.v != null) {
+			IEntity entity = this.v.parseEntity();
+			if (DBState.U == this.v.getDbState()) {
+				hibernate.saveOrUpdate(entity);
+			} else if (DBState.D == this.v.getDbState()) {
+				hibernate.delete(entity);
+			}
+			changeDbState(this.v, DBState.P);
+			// entry.setDbState(DBState.P);
+			// 占位：发送到更新队列，状态P
+			ConcurrentCache.getInstance().sendToUpdateQueue(this.v);
 		}
-		entry.setDbState(DBState.P);
-		// 占位：发送到更新队列，状态P
-		ConcurrentCache.getInstance().sendToUpdateQueue(entry);
 	}
 
 	@Override
@@ -114,28 +135,28 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 				if (DBState.P != dbState) {
 					throw new RuntimeException("对象被删除后不允许再修改");
 				} else {
+					entry.changeDbState(dbState);
 					itor.remove();
 					return true;
 				}
 			}
 		}
 
-		if (this.v == entry){
-			entry.changeDbState(dbState);
-			// v对象处理
-			if (DBState.D == dbState) {
-				this.deletedSet.add(this.v);
-				this.v = null;
-			}
-			return true;
+		Preconditions.checkArgument(this.v == entry, "缓存内对象不一致");
+
+		entry.changeDbState(dbState);
+		// v对象处理
+		if (DBState.D == dbState) {
+			this.deletedSet.add(this.v);
+			this.v = null;
 		}
-		return false;
+		return true;
 	}
 
 	@Override
 	protected void attachedKey(String attachedKey) {
 		if (this.v != null) {
-			this.v.setAttachedKey(getAttachedKey());
+			this.v.resetRef(this);
 		}
 	}
 }
