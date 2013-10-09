@@ -1,22 +1,15 @@
 package com.cm4j.test.guava.consist;
 
-import java.io.Serializable;
-import java.util.AbstractQueue;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.concurrent.locks.ReentrantLock;
-
+import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.loader.CacheLoader;
+import com.cm4j.test.guava.consist.loader.CacheValueLoader;
+import com.cm4j.test.guava.consist.loader.PrefixMappping;
+import com.cm4j.test.guava.service.ServiceManager;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.AbstractSequentialIterator;
 import org.hibernate.HibernateException;
 import org.hibernate.NonUniqueObjectException;
 import org.hibernate.Session;
@@ -28,16 +21,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DataAccessException;
 
-import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.consist.loader.CacheDescriptor;
-import com.cm4j.test.guava.consist.loader.CacheLoader;
-import com.cm4j.test.guava.consist.loader.CacheValueLoader;
-import com.cm4j.test.guava.consist.loader.PrefixMappping;
-import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
-import com.google.common.collect.AbstractSequentialIterator;
+import java.io.Serializable;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * <pre>
@@ -45,7 +35,7 @@ import com.google.common.collect.AbstractSequentialIterator;
  * 读取：{@link ConcurrentCache}提供get or load、put、expire操作
  * 
  * 写入：是由{@link CacheEntry#changeDbState(DBState)}控制对象状态
- * 同时{@link PersistCache}独立维护了一份写入队列，独立于缓存操作
+ * 同时{@link ConcurrentCache}独立维护了一份写入队列，独立于缓存操作
  * 
  * 使用流程：
  * 1.定义缓存描述信息{@link CacheDescriptor}
@@ -114,7 +104,7 @@ public class ConcurrentCache {
 	}
 
 	/* ---------------- Inner Classes -------------- */
-	private static class HashEntry implements ReferenceEntry {
+	private final static class HashEntry implements ReferenceEntry {
 		// HashEntery内对象的final不变性来降低读操作对加锁的需求
 		final String key;
 		final int hash;
