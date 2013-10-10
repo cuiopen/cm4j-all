@@ -1,15 +1,15 @@
 package com.cm4j.test.guava.consist;
 
+import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.service.ServiceManager;
+import com.google.common.base.Preconditions;
+
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
-
-import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
 
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
@@ -19,7 +19,6 @@ import com.google.common.base.Preconditions;
  * @since 2013-1-18 上午10:25:04
  * 
  * @param <V>
- * @param <C>
  */
 public class ListReference<V extends CacheEntry> extends AbsReference {
 	private final CopyOnWriteArraySet<V> all_objects = new CopyOnWriteArraySet<V>();

@@ -1,13 +1,13 @@
 package com.cm4j.test.guava.consist;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * 单个缓存对象，一个reference只能存放一次对象
