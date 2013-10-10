@@ -1,9 +1,8 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicLong;
-
+import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.entity.TestTable;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -12,11 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.cm4j.test.guava.consist.AbsReference;
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 多线程异步短时间过期+写入测试
@@ -70,7 +67,7 @@ public class ListFunctionTest {
 						random = RandomUtils.nextInt(1000);
 					}
 					if (random >= 100) {
-						SingleReference<TestTable> ref = new TableIdCache(random).ref();
+						SingleReference<TestTable> ref = null; // new TableIdCache(random).ref();
 
 						synchronized (counter) {
 							TestTable testTable = ref.get();

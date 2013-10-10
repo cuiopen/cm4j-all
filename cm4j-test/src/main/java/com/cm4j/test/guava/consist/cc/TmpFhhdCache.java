@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.caches.cc;
+package com.cm4j.test.guava.consist.cc;
 
 import org.apache.commons.lang.math.NumberUtils;
 

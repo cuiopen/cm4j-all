@@ -1,8 +1,7 @@
 package com.cm4j.test.guava.consist.loader;
 
 import com.cm4j.test.guava.consist.AbsReference;
-import com.cm4j.test.guava.consist.usage.caches.cc.TmpFhhdCache;
-import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
+import com.cm4j.test.guava.consist.cc.TmpFhhdCache;
 
 /**
  * 缓存前缀与描述的映射
@@ -13,9 +12,7 @@ import com.cm4j.test.guava.consist.usage.caches.single.TableIdCache;
  */
 public enum PrefixMappping {
 
-	$1(TmpFhhdCache.class),
-	$2(TableIdCache.class);
-
+	$1(TmpFhhdCache.class);
 
 	private Class<? extends CacheDescriptor<?>> cacheDesc;
 

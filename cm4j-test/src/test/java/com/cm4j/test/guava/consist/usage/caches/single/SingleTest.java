@@ -1,5 +1,6 @@
 package com.cm4j.test.guava.consist.usage.caches.single;
 
+import com.cm4j.test.guava.consist.cc.TmpFhhdCache;
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -13,7 +14,6 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
-import com.cm4j.test.guava.consist.usage.caches.cc.TmpFhhdCache;
 import com.cm4j.test.guava.service.ServiceManager;
 
 /**

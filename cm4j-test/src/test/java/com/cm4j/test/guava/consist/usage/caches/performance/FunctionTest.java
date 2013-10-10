@@ -1,9 +1,9 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicLong;
-
+import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.cc.TmpFhhdCache;
+import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -12,10 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.entity.TmpFhhd;
-import com.cm4j.test.guava.consist.usage.caches.cc.TmpFhhdCache;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 多线程异步短时间过期+写入测试
