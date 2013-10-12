@@ -44,9 +44,12 @@ public class ListFunctionTest {
 
         ConcurrentCache.getInstance().stop();
 
+        long writeEnd = System.nanoTime();
+
         System.out.println("======================");
-        System.out.println("完成，总运行个数：" + counter.get());
-        System.out.println((double) (end - start) / 1000000000);
+        System.out.println("完成，数值sum为：" + counter.get());
+        System.out.println("计算消耗时间[s]：" + (double) (end - start) / 1000000000);
+        System.out.println("写入消耗时间[s]：" + (double) (writeEnd - end) / 1000000000);
     }
 
     public class randomThread implements Runnable {
@@ -66,7 +69,7 @@ public class ListFunctionTest {
                     int random = RandomUtils.nextInt(1000);
                     ListReference<TmpListMultikey> ref = new TmpListMultikeyCache(50705).ref();
 
-                    synchronized (counter) {
+                    synchronized (ref) {
                         TmpListMultikey tmp = new TmpListMultikeyCache(50705).findByType(random);
                         if (tmp == null) {
                             ref.update(new TmpListMultikey(new TmpListMultikeyPK(50705, random), 1));

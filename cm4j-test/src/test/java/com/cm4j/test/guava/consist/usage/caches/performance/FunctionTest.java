@@ -69,18 +69,18 @@ public class FunctionTest {
 					try {
 						int random = RandomUtils.nextInt(1000);
 
-						synchronized (counter) {
-							SingleReference<TmpFhhd> ref = new TmpFhhdCache(random).ref();
+                        SingleReference<TmpFhhd> ref = new TmpFhhdCache(random).ref();
+                        synchronized (ref) {
 
 							TmpFhhd fhhd = ref.get();
 							if (fhhd == null) {
 								long num = counter.incrementAndGet();
 								
 								ref.update(new TmpFhhd(random, 1, 1, ""));
+
+                                // persist需注释
 								ref.persist();
 
-								// logger.debug("new 新对象{},总计 = {}", random,
-								// num);
 							} else {
 								double d = RandomUtils.nextDouble();
 								if (d >= 0) {
@@ -90,17 +90,15 @@ public class FunctionTest {
 									fhhd.update();
 
 									// todo 有新增或删除的persist为嘛会报错？？？
+                                    // 这里是保存，测试需注释
 									ref.persist();
-
-									// logger.debug("对象{} +1,总计 = {}", random,
-									// num);
 								} else {
 									counter.addAndGet(-fhhd.getNCurToken());
 
 									fhhd.delete();
-									ref.persist();
 
-//									logger.debug("对象 {} 被删除", fhhd.getNPlayerId());
+                                    // persist需注释
+									ref.persist();
 								}
 							}
 						}
