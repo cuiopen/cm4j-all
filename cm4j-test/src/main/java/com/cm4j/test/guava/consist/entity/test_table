@@ -1,0 +1,5 @@
+CREATE TABLE `test_table` (
+  `n_id` int(11) NOT NULL,
+  `n_value` bigint(20) DEFAULT NULL,
+  PRIMARY KEY (`n_id`)
+)
