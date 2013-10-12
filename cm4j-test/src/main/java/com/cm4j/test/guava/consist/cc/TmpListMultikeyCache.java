@@ -1,7 +1,6 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.ListReference;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.loader.CacheDescriptor;
@@ -29,12 +28,14 @@ public class TmpListMultikeyCache extends CacheDescriptor<ListReference<TmpListM
         Preconditions.checkArgument(params.length == 1);
         HibernateDao<TmpListMultikey, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(TmpListMultikey.class);
-        return new ListReference<TmpListMultikey>(hibernate.findAllByProperty("nPlayerId", NumberUtils.toInt(params[0])));
+        String hql = "from TmpListMultikey where id.NPlayerId = ?";
+        return new ListReference<TmpListMultikey>(hibernate.findAll(hql, NumberUtils.toInt(params[0])));
     }
 
     public TmpListMultikey findByType(int type) {
-        ListReference<TmpListMultikey> all = ConcurrentCache.getInstance().get(this);
-        for (TmpListMultikey _TmpListMultikey : all.get()) {
+        ListReference<TmpListMultikey> ref = ref();
+
+        for (TmpListMultikey _TmpListMultikey : ref.get()) {
             if (_TmpListMultikey.getId().getNType() == type) {
                 return _TmpListMultikey;
             }

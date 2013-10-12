@@ -132,7 +132,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 		Iterator<V> itor = deletedSet.iterator();
 		while (itor.hasNext()) {
 			V v = (V) itor.next();
-			// 进入deleteSet的对象只能被写入，
+			// 进入deleteSet的对象只能被写入
 			if (v == entry) {
 				Preconditions.checkArgument(DBState.P == dbState, "对象被删除后不允许再修改");
 				itor.remove();
@@ -143,7 +143,6 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 		for (V e : all_objects) {
 			if (e == entry) {
 				e.changeDbState(dbState);
-
 				if (DBState.D == dbState) {
 					this.deletedSet.add(e);
 					this.all_objects.remove(e);

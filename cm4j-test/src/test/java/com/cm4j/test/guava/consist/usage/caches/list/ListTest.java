@@ -41,17 +41,21 @@ public class ListTest {
 
     @Test
     public void changeTest() {
-        ListReference<TmpListMultikey> reference = ConcurrentCache.getInstance().get(new TmpListMultikeyCache(6));
+        ListReference<TmpListMultikey> ref = new TmpListMultikeyCache(50705).ref();
         // 注意：这里的Value不一定就是和Key是一致的
         // 不一致代表把新对象加入到此缓存中，这样缓存过期之前是没问题的，但过期后再查询db是有问题的，所以不要这样写
 
         // 也就是：不要去更改缓存的键里面的值，加入到缓存的值的键要一致
         TmpListMultikey table = new TmpListMultikey(new TmpListMultikeyPK(50705, 2), 1);
-        reference.update(table);
+        ref.update(table);
 
         Assert.assertEquals(1, new TmpListMultikeyCache(50705).findByType(2).getNValue());
 
-        reference.delete(table);
-        Assert.assertNull(new TmpListMultikeyCache(50705).findByType(2));
+        ref.delete(table);
+        // table.delete();
+
+        TmpListMultikey val = new TmpListMultikeyCache(50705).findByType(2);
+        System.out.println(val);
+        Assert.assertNull(val);
     }
 }
