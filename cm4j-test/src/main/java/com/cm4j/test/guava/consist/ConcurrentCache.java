@@ -570,12 +570,6 @@ public class ConcurrentCache {
                     break;
                 }
 
-                if (map.isDebug) {
-                    // access
-                    // 注意：这里的无限循环
-                    map.logger.trace("segment.accessQueue个数:{},size:{}", accessQueue.size(), count);
-                }
-
                 if (map.isDebug && accessQueue.size() != count) {
                     throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
                 }
@@ -1079,7 +1073,7 @@ public class ConcurrentCache {
 
     interface ReferenceEntry {
         /*
-		 * Used by entries that use access order. Access entries are maintained
+         * Used by entries that use access order. Access entries are maintained
 		 * in a doubly-linked list. New entries are added at the tail of the
 		 * list at write time; stale entries are expired from the head of the
 		 * list.
@@ -1347,7 +1341,7 @@ public class ConcurrentCache {
     }
 
 	/*
-	 * ================== utils =====================
+     * ================== utils =====================
 	 */
 
     /**

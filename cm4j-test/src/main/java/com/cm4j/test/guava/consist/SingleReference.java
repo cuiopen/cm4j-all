@@ -5,10 +5,6 @@ import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-
 /**
  * 单个缓存对象，一个reference只能存放一次对象
  *
@@ -18,10 +14,6 @@ import java.util.Set;
 public class SingleReference<V extends CacheEntry> extends AbsReference {
 
     private V v;
-
-    // 用于存放暂时未被删除对象
-    // 里面对象只能被删除，不可更改状态
-    private Set<V> deletedSet = new HashSet<V>();
 
     public SingleReference(V value) {
         this.v = value;
@@ -83,10 +75,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
     }
 
     @Override
-    protected boolean isAllPersist() {
-        if (deletedSet.size() > 0) {
-            return false;
-        }
+    protected boolean allPersist() {
         if (this.v != null && DBState.P != this.v.getDbState()) {
             return false;
         }
@@ -98,14 +87,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
     protected void persistDB() {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         // deleteSet数据处理
-        for (V v : deletedSet) {
-            hibernate.delete(v);
-            changeDbState(v, DBState.P);
-            // entry.setDbState(DBState.P);
-            // 占位：发送到更新队列，状态P
-            ConcurrentCache.getInstance().sendToUpdateQueue(v);
-        }
-        deletedSet.clear();
+        persistDeleteSet();
 
         // v数据处理
         // 有可能对象被删除到deletedSet，entry则为null
@@ -125,16 +107,9 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
 
     @Override
     protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-        // deleteSet数据处理
-        Iterator<V> itor = deletedSet.iterator();
-        while (itor.hasNext()) {
-            V v = (V) itor.next();
-            // 进入deleteSet的对象只能被写入，
-            if (v == entry) {
-                Preconditions.checkArgument(DBState.P == dbState, "对象被删除后不允许再修改");
-                itor.remove();
-                return true;
-            }
+        // deleteSet中数据状态修改
+        if (checkAndDealDeleteSet(entry, dbState)) {
+            return true;
         }
 
         Preconditions.checkArgument(this.v == entry, "缓存内对象不一致");
@@ -142,7 +117,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
         entry.changeDbState(dbState);
         // v对象处理
         if (DBState.D == dbState) {
-            this.deletedSet.add(this.v);
+            getDeletedSet().add(this.v);
             this.v = null;
         }
         return true;
