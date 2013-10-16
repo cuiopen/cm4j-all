@@ -19,7 +19,6 @@ public enum PrefixMappping {
 
     PrefixMappping(Class<? extends CacheDescriptor<?>> cacheDesc) {
         this.cacheDesc = cacheDesc;
-
     }
 
     /**
