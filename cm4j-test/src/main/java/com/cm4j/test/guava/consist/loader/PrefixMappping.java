@@ -12,6 +12,7 @@ import com.cm4j.test.guava.consist.cc.TmpListMultikeyListCache;
  */
 public enum PrefixMappping {
 
+    // 这里是否可改成直接创建对象？
     $1(TmpFhhdCache.class),
     $2(TmpListMultikeyListCache.class);
 
