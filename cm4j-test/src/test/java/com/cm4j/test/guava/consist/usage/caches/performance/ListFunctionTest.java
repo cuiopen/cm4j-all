@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.usage.caches.performance;
 
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.ListReference;
-import com.cm4j.test.guava.consist.cc.TmpListMultikeyCache;
+import com.cm4j.test.guava.consist.cc.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.entity.TmpListMultikeyPK;
 import org.apache.commons.lang.math.RandomUtils;
@@ -67,10 +67,10 @@ public class ListFunctionTest {
                 barrier.await();
                 for (int i = 0; i < 5000; i++) { // 执行20000次
                     int random = RandomUtils.nextInt(1000);
-                    ListReference<TmpListMultikey> ref = new TmpListMultikeyCache(50705).ref();
+                    ListReference<TmpListMultikey> ref = new TmpListMultikeyListCache(50705).ref();
 
                     synchronized (ref) {
-                        TmpListMultikey tmp = new TmpListMultikeyCache(50705).findByType(random);
+                        TmpListMultikey tmp = new TmpListMultikeyListCache(50705).findByType(random);
                         if (tmp == null) {
                             ref.update(new TmpListMultikey(new TmpListMultikeyPK(50705, random), 1));
                             long num = counter.incrementAndGet();

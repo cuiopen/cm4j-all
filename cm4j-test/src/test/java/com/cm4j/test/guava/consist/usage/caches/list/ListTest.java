@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.usage.caches.list;
 
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.ListReference;
-import com.cm4j.test.guava.consist.cc.TmpListMultikeyCache;
+import com.cm4j.test.guava.consist.cc.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.entity.TmpListMultikeyPK;
 import org.junit.Assert;
@@ -24,7 +24,7 @@ public class ListTest {
 
     @Test
     public void getTest() {
-        TmpListMultikeyCache desc = new TmpListMultikeyCache(50705);
+        TmpListMultikeyListCache desc = new TmpListMultikeyListCache(50705);
         desc.ref().update(new TmpListMultikey(new TmpListMultikeyPK(50705, 1), 1));
 
         // 基于desc搜索结果上的二次筛选
@@ -41,7 +41,7 @@ public class ListTest {
 
     @Test
     public void changeTest() {
-        ListReference<TmpListMultikey> ref = new TmpListMultikeyCache(50705).ref();
+        ListReference<TmpListMultikey> ref = new TmpListMultikeyListCache(50705).ref();
         // 注意：这里的Value不一定就是和Key是一致的
         // 不一致代表把新对象加入到此缓存中，这样缓存过期之前是没问题的，但过期后再查询db是有问题的，所以不要这样写
 
@@ -49,12 +49,12 @@ public class ListTest {
         TmpListMultikey table = new TmpListMultikey(new TmpListMultikeyPK(50705, 2), 1);
         ref.update(table);
 
-        Assert.assertEquals(1, new TmpListMultikeyCache(50705).findByType(2).getNValue());
+        Assert.assertEquals(1, new TmpListMultikeyListCache(50705).findByType(2).getNValue());
 
         ref.delete(table);
         // table.delete();
 
-        TmpListMultikey val = new TmpListMultikeyCache(50705).findByType(2);
+        TmpListMultikey val = new TmpListMultikeyListCache(50705).findByType(2);
         System.out.println(val);
         Assert.assertNull(val);
     }

@@ -1144,8 +1144,6 @@ public class ConcurrentCache {
             return 0;
         }
 
-        ;
-
         @Override
         public long getAccessTime() {
             return 0;

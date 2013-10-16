@@ -14,12 +14,12 @@ import org.apache.commons.lang.math.NumberUtils;
  * User: yanghao
  * Date: 13-10-11 下午3:16
  */
-public class TmpListMultikeyCache extends CacheDescriptor<ListReference<TmpListMultikey>> {
+public class TmpListMultikeyListCache extends CacheDescriptor<ListReference<TmpListMultikey>> {
 
-    public TmpListMultikeyCache() {
+    public TmpListMultikeyListCache() {
     }
 
-    public TmpListMultikeyCache(int playerId) {
+    public TmpListMultikeyListCache(int playerId) {
         super(playerId);
     }
 
