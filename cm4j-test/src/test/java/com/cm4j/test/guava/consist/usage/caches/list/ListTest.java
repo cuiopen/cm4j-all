@@ -13,10 +13,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 /**
  * 1.缓存过期了不应该能修改状态? 使用引用队列？<br>
- * 2.单个对象的状态修改？ 不要放到应用中修改，放到SingleValue和ListValue中处理
  *
- * @author Yang.hao
- * @since 2013-2-15 上午09:45:41
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath*:test_1/spring-ds.xml"})

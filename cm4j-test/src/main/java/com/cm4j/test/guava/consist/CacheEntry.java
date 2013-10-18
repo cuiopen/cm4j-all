@@ -1,12 +1,12 @@
 package com.cm4j.test.guava.consist;
 
-import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.keys.Identity;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+
+import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 单个缓存值，例如数据库中的一行数据<br>
@@ -36,7 +36,7 @@ public abstract class CacheEntry {
 	 * 更新此对象
 	 */
 	public void update() {
-		Preconditions.checkNotNull(this.ref);
+		Preconditions.checkNotNull(this.ref,"缓存中不存在此对象，请调用Reference中方法添加到缓存中");
 		this.ref.updateEntry(this);
 	}
 

@@ -892,6 +892,9 @@ public class ConcurrentCache {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
                 if (e != null && e.value != null && !e.value.isAllPersist()) {
+                    // deleteSet数据保存
+                    e.value.persistDeleteSet();
+                    // 非deleteSet数据保存
                     e.value.persistDB();
                     if (isRemove) {
                         segment.removeEntry(e, hash);

@@ -42,7 +42,7 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
     }
 
     public void put(K key, V value) {
-        Preconditions.checkArgument(!map.containsKey(key), "对象已存在，无法再设值");
+        Preconditions.checkArgument(!map.containsKey(key), "对象已存在，请调用update(V)更新对象");
         value.resetRef(this);
         map.put(key, value);
 
@@ -50,7 +50,7 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
     }
 
     public void update(V value) {
-        Preconditions.checkArgument(map.containsValue(value), "对象不存在，无法修改");
+        Preconditions.checkArgument(map.containsValue(value), "对象不存在，请通过put(K,V)增加对象到缓存中");
         // 存在则修改
         ConcurrentCache.getInstance().changeDbState(value, DBState.U);
 
@@ -99,8 +99,6 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
     @Override
     protected void persistDB() {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-        // deleteSet数据处理
-        persistDeleteSet();
 
         for (CacheEntry entry : map.values()) {
             if (DBState.P != entry.getDbState()) {

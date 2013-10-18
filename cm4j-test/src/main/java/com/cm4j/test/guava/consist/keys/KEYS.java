@@ -47,6 +47,7 @@ public abstract class KEYS {
 		try {
 			Preconditions.checkArgument(param instanceof String || param instanceof Number || param instanceof Boolean
 					|| param instanceof Character || param == null, "参数必须是java基础类型");
+            Preconditions.checkArgument(!String.valueOf(param).contains("_"),"参数不能包含_");
 		} catch (Exception e) {
 			Throwables.propagate(e);
 		}

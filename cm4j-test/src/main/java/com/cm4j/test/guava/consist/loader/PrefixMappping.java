@@ -3,6 +3,7 @@ package com.cm4j.test.guava.consist.loader;
 import com.cm4j.test.guava.consist.AbsReference;
 import com.cm4j.test.guava.consist.cc.TmpFhhdCache;
 import com.cm4j.test.guava.consist.cc.TmpListMultikeyListCache;
+import com.cm4j.test.guava.consist.cc.TmpListMultikeyMapCache;
 
 /**
  * 缓存前缀与描述的映射
@@ -15,7 +16,8 @@ public enum PrefixMappping {
     // 这里是否可改成直接创建对象？
     // 后期修改
     $1(TmpFhhdCache.class),
-    $2(TmpListMultikeyListCache.class);
+    $2(TmpListMultikeyListCache.class),
+    $3(TmpListMultikeyMapCache.class);
 
     private Class<? extends CacheDescriptor<?>> cacheDesc;
 

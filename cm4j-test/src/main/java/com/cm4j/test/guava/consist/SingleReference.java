@@ -86,8 +86,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
     @Override
     protected void persistDB() {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-        // deleteSet数据处理
-        persistDeleteSet();
 
         // v数据处理
         // 有可能对象被删除到deletedSet，entry则为null

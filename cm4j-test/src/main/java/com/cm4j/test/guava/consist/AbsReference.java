@@ -51,7 +51,8 @@ public abstract class AbsReference {
 
     /**
      * 是否所有对象都与数据库保持一致(状态P)
-     * 缓存过期是否可移除的判断条件之一，此方法在lock下被调用<br>
+     * 缓存过期是否可移除的判断条件之一<br />
+     * <font color="red">此方法在lock下被调用</font>
      *
      * @return
      */
@@ -64,14 +65,16 @@ public abstract class AbsReference {
 
     /**
      * 非deleteSet的数据是否都是P的状态
-     * 缓存过期是否可移除的判断条件之一，此方法在lock下被调用
+     * 缓存过期是否可移除的判断条件之一<br />
+     * <font color="red">此方法在lock下被调用</font>
      *
      * @return
      */
     protected abstract boolean allPersist();
 
     /**
-     * 持久化到数据库，用于persistAndRemove()，此方法在lock下被调用
+     * 非deleteSet数据保存，deleteSet中数据在persistAndRemove()已经处理了<br />
+     * <font color="red">此方法在lock下被调用</font>
      */
     protected abstract void persistDB();
 
