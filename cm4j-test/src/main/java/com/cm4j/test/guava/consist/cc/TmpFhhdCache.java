@@ -5,11 +5,11 @@ import org.apache.commons.lang.math.NumberUtils;
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
-import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
-public class TmpFhhdCache extends CacheDescriptor<SingleReference<TmpFhhd>> {
+public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
 
 	public TmpFhhdCache() {
 	}

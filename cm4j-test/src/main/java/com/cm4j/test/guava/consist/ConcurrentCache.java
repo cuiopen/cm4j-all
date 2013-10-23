@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
@@ -38,7 +38,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * 同时{@link ConcurrentCache}独立维护了一份写入队列，独立于缓存操作
  *
  * 使用流程：
- * 1.定义缓存描述信息{@link CacheDescriptor}
+ * 1.定义缓存描述信息{@link com.cm4j.test.guava.consist.loader.CacheDefiniens}
  * 2.定义映射{@link PrefixMappping}
  * </pre>
  *
@@ -66,7 +66,7 @@ public class ConcurrentCache {
     static final int RETRIES_BEFORE_LOCK = 2;
 
     // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(6000);
+    final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(50);
     /**
      * TODO 更新队列检测间隔，单位s
      */
@@ -800,7 +800,7 @@ public class ConcurrentCache {
     }
 
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V get(CacheDescriptor<V> desc) {
+    public <V extends AbsReference> V get(CacheDefiniens<V> desc) {
         String key = desc.getKey();
         int hash = rehash(key.hashCode());
         return (V) segmentFor(hash).get(key, hash, loader, true);
@@ -812,7 +812,7 @@ public class ConcurrentCache {
      * @return 不存在时返回的reference为null
      */
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V getIfPresent(CacheDescriptor<V> desc) {
+    public <V extends AbsReference> V getIfPresent(CacheDefiniens<V> desc) {
         String key = desc.getKey();
         int hash = rehash(key.hashCode());
         return (V) segmentFor(hash).get(key, hash, loader, false);
@@ -826,14 +826,14 @@ public class ConcurrentCache {
      * @return
      */
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V refresh(CacheDescriptor<V> desc) {
+    public <V extends AbsReference> V refresh(CacheDefiniens<V> desc) {
         String key = desc.getKey();
         int hash = rehash(key.hashCode());
         return (V) segmentFor(hash).refresh(key, hash, loader);
     }
 
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V put(CacheDescriptor<V> desc, AbsReference value) {
+    public <V extends AbsReference> V put(CacheDefiniens<V> desc, AbsReference value) {
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
         Preconditions.checkNotNull(value);
 
@@ -856,7 +856,7 @@ public class ConcurrentCache {
      * 不存在时放入缓存
      */
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V putIfAbsent(CacheDescriptor<V> desc, AbsReference value) {
+    public <V extends AbsReference> V putIfAbsent(CacheDefiniens<V> desc, AbsReference value) {
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
         Preconditions.checkNotNull(value);
 
@@ -872,7 +872,7 @@ public class ConcurrentCache {
      * @param isRemove
      *         是否移除
      */
-    public void persistAndRemove(CacheDescriptor<? extends AbsReference> desc, boolean isRemove) {
+    public void persistAndRemove(CacheDefiniens<? extends AbsReference> desc, boolean isRemove) {
         persistAndRemove(desc.getKey(), isRemove);
     }
 
@@ -934,7 +934,7 @@ public class ConcurrentCache {
         return segmentFor(hash).remove(key, hash, value) != null;
     }
 
-    public void remove(CacheDescriptor<? extends AbsReference> desc) {
+    public void remove(CacheDefiniens<? extends AbsReference> desc) {
         remove(desc.getKey());
     }
 
@@ -948,7 +948,7 @@ public class ConcurrentCache {
         return segmentFor(hash).containsKey(key, hash);
     }
 
-    public boolean contains(CacheDescriptor<? extends AbsReference> cacheDesc) {
+    public boolean contains(CacheDefiniens<? extends AbsReference> cacheDesc) {
         return containsKey(cacheDesc.getKey());
     }
 

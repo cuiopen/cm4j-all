@@ -19,9 +19,9 @@ public enum PrefixMappping {
     $2(TmpListMultikeyListCache.class),
     $3(TmpListMultikeyMapCache.class);
 
-    private Class<? extends CacheDescriptor<?>> cacheDesc;
+    private Class<? extends CacheDefiniens<?>> cacheDesc;
 
-    PrefixMappping(Class<? extends CacheDescriptor<?>> cacheDesc) {
+    PrefixMappping(Class<? extends CacheDefiniens<?>> cacheDesc) {
         this.cacheDesc = cacheDesc;
     }
 
@@ -31,7 +31,7 @@ public enum PrefixMappping {
      * @param cacheDesc
      * @return
      */
-    public static PrefixMappping getMapping(CacheDescriptor<? extends AbsReference> cacheDesc) {
+    public static PrefixMappping getMapping(CacheDefiniens<? extends AbsReference> cacheDesc) {
         PrefixMappping[] values = values();
         for (PrefixMappping value : values) {
             if (value.getCacheDesc().isAssignableFrom(cacheDesc.getClass())) {
@@ -41,7 +41,7 @@ public enum PrefixMappping {
         return null;
     }
 
-    public Class<? extends CacheDescriptor<?>> getCacheDesc() {
+    public Class<? extends CacheDefiniens<?>> getCacheDesc() {
         return cacheDesc;
     }
 }

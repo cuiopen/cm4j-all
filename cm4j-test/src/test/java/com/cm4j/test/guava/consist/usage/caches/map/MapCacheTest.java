@@ -37,8 +37,8 @@ public class MapCacheTest {
 
     @Test
     public void deleteTest() {
-        new TmpListMultikeyMapCache(1001).ref().delete(1);
-        new TmpListMultikeyMapCache(1001).ref().persist();
+        MapReference<Integer, TmpListMultikey> ref = new TmpListMultikeyMapCache(1001).ref();
+        ref.delete(1);
+        ref.persist();
     }
-
 }

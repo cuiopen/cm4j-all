@@ -7,24 +7,24 @@ import com.cm4j.test.guava.consist.keys.KEYS.JOINER;
 import com.google.common.base.Preconditions;
 
 /**
- * 缓存信息描述
+ * 缓存定义类
  * 
  * @author Yang.hao
  * @since 2013-1-19 下午01:13:54
  * 
  */
-public abstract class CacheDescriptor<V extends AbsReference> {
+public abstract class CacheDefiniens<V extends AbsReference> {
 
 	private Object[] params;
 
-	protected CacheDescriptor() {
+	protected CacheDefiniens() {
 	}
 	
 	/**
 	 * 子类可调用本方法，用可变数值做参数<br>
 	 * 或者新建一个无参构造函数用于{@link PrefixMappping}映射，有参构造函数则指明具体参数类型
 	 */
-	protected CacheDescriptor(Object... params) {
+	protected CacheDefiniens(Object... params) {
 		for (Object param : params) {
 			KEYS.checkParam(param);
 		}

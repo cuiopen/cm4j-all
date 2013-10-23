@@ -4,7 +4,7 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
-import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * 用来记录用法
  */
-public class TableAndNameCache extends CacheDescriptor<SingleReference<TableAndNameVO>> {
+public class TableAndNameCache extends CacheDefiniens<SingleReference<TableAndNameVO>> {
 
 	public TableAndNameCache(Object... params) {
 		super(params);

@@ -28,8 +28,8 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 
 		try {
 			// 这里配的是无参数对象
-			Class<? extends CacheDescriptor<?>> clazz = mappping.getCacheDesc();
-			CacheDescriptor desc = clazz.newInstance();
+			Class<? extends CacheDefiniens<?>> clazz = mappping.getCacheDesc();
+			CacheDefiniens desc = clazz.newInstance();
 			
 			AbsReference result = desc.load(params);
 			Preconditions.checkNotNull(result);

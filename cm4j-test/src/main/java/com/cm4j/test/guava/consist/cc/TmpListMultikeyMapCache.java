@@ -3,7 +3,7 @@ package com.cm4j.test.guava.consist.cc;
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.MapReference;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
-import com.cm4j.test.guava.consist.loader.CacheDescriptor;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.math.NumberUtils;
@@ -18,7 +18,7 @@ import java.util.Map;
  * User: yanghao
  * Date: 13-10-16 上午9:29
  */
-public class TmpListMultikeyMapCache extends CacheDescriptor<MapReference<Integer, TmpListMultikey>> {
+public class TmpListMultikeyMapCache extends CacheDefiniens<MapReference<Integer, TmpListMultikey>> {
 
     public TmpListMultikeyMapCache() {
     }
