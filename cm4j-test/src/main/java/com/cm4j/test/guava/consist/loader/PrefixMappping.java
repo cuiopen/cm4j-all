@@ -13,8 +13,7 @@ import com.cm4j.test.guava.consist.cc.TmpListMultikeyMapCache;
  */
 public enum PrefixMappping {
 
-    // 这里是否可改成直接创建对象？
-    // 后期修改
+    // 不直接用对象，是为了防止构造函数设置的参数不清除，导致其他缓存查询问题
     $1(TmpFhhdCache.class),
     $2(TmpListMultikeyListCache.class),
     $3(TmpListMultikeyMapCache.class);
@@ -28,13 +27,13 @@ public enum PrefixMappping {
     /**
      * 根据描述找到对应class的类
      *
-     * @param cacheDesc
+     * @param cacheDef
      * @return
      */
-    public static PrefixMappping getMapping(CacheDefiniens<? extends AbsReference> cacheDesc) {
+    public static PrefixMappping getMapping(CacheDefiniens<? extends AbsReference> cacheDef) {
         PrefixMappping[] values = values();
         for (PrefixMappping value : values) {
-            if (value.getCacheDesc().isAssignableFrom(cacheDesc.getClass())) {
+            if (value.getCacheDesc().isAssignableFrom(cacheDef.getClass())) {
                 return value;
             }
         }

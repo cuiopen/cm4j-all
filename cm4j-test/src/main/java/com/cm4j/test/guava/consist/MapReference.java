@@ -4,6 +4,7 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 
 import java.util.Map;
 import java.util.Set;
@@ -31,10 +32,15 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
      * ===================== public methods =====================
 	 */
 
+    /**
+     * 获取值
+     *
+     * @return 不可更改的map，以防止外部破坏内部结构和状态
+     */
     @SuppressWarnings("unchecked")
     @Override
     public Map<K, V> get() {
-        return map;
+        return ImmutableMap.copyOf(map);
     }
 
     public V get(K key) {

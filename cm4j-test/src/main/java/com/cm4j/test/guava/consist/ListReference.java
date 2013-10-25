@@ -4,10 +4,10 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * list 缓存对象建议使用此类，避免对状态的操作<br>
@@ -18,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * @since 2013-1-18 上午10:25:04
  */
 public class ListReference<V extends CacheEntry> extends AbsReference {
-    private final CopyOnWriteArraySet<V> all_objects = new CopyOnWriteArraySet<V>();
+    private final CopyOnWriteArrayList<V> all_objects = new CopyOnWriteArrayList<V>();
 
     /**
      * 初始化
@@ -35,11 +35,13 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
     /**
      * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
      * {@link #update(CacheEntry)}
+     *
+     * @return 不可更改的list，以防止外部破坏内部结构和状态
      */
     @SuppressWarnings("unchecked")
     @Override
-    public Set<V> get() {
-        return all_objects;
+    public List<V> get() {
+        return ImmutableList.copyOf(all_objects);
     }
 
     /**
@@ -64,7 +66,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
     }
 
 	/*
-	 * ================== extend methods ====================
+     * ================== extend methods ====================
 	 */
 
     @Override
