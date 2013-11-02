@@ -56,17 +56,19 @@ public class ConcurrentCache {
     }
 
     /* ---------------- Constants -------------- */
-    // TODO 默认为16
+    // 初始化缓存数据个数 默认为16
     static final int DEFAULT_INITIAL_CAPACITY = 16;
+    // 加载因子
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
     // TODO 默认设为16
-    static final int DEFAULT_CONCURRENCY_LEVEL = 2;
+    // 默认segment的个数
+    static final int DEFAULT_CONCURRENCY_LEVEL = 1;
     static final int MAXIMUM_CAPACITY = 1 << 30;
     static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
     static final int RETRIES_BEFORE_LOCK = 2;
 
     // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(50);
+    final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(500);
     /**
      * TODO 更新队列检测间隔，单位s
      */
@@ -199,7 +201,9 @@ public class ConcurrentCache {
         transient volatile AtomicReferenceArray<HashEntry> table;
         final float loadFactor;
 
+        // 缓存读取，写入的对象都需要放入recencyQueue
         final Queue<ReferenceEntry> recencyQueue = new ConcurrentLinkedQueue<ReferenceEntry>();
+        // 真正中缓存的访问顺序
         // accessQueue的大小应该与缓存的size一样大
         final AccessQueue accessQueue = new AccessQueue();
         final AtomicInteger readCount = new AtomicInteger();
@@ -390,6 +394,8 @@ public class ConcurrentCache {
                 if (c++ > threshold) { // ensure capacity
                     rehash();
                 }
+                // 为什么要创建tab指向table
+                // 这是因为table变量是volatile类型，多次读取volatile类型的开销要比非volatile开销要大，而且编译器也无法优化
                 AtomicReferenceArray<HashEntry> tab = table;
                 int index = hash & (tab.length() - 1);
                 HashEntry first = tab.get(index);
@@ -436,7 +442,7 @@ public class ConcurrentCache {
 
             int newCount = count;
             AtomicReferenceArray<HashEntry> newTable = HashEntry.newArray(oldCapacity << 1);
-            threshold = newTable.length() * 3 / 4;
+            threshold = (int)(newTable.length() * loadFactor);
             int newMask = newTable.length() - 1;
             for (int oldIndex = 0; oldIndex < oldCapacity; ++oldIndex) {
                 // We need to guarantee that any existing reads of old Map can
@@ -447,24 +453,26 @@ public class ConcurrentCache {
                     HashEntry next = head.next;
                     int headIndex = head.getHash() & newMask;
 
-                    // Single node on list
+                    // next为空代表这个链表就只有一个元素，直接把这个元素设置到新数组中
                     if (next == null) {
                         newTable.set(headIndex, head);
                     } else {
+                        // 有多个元素时
                         HashEntry tail = head;
                         int tailIndex = headIndex;
+                        // 从head开始，一直到链条末尾，找到最后一个下标与head下标不一致的元素
                         for (HashEntry e = next; e != null; e = e.next) {
                             int newIndex = e.getHash() & newMask;
+                            // 这里的找到后没有退出循环，继续找下一个不一致的下标
                             if (newIndex != tailIndex) {
-                                // The index changed. We'll need to copy the
-                                // previous entry.
                                 tailIndex = newIndex;
                                 tail = e;
                             }
                         }
+                        // 找到的是最后一个不一致的，所以tail往后的都是一致的下标
                         newTable.set(tailIndex, tail);
 
-                        // Clone nodes leading up to the tail.
+                        // 在这之前的元素下标有可能一样，也有可能不一样，所以把前面的元素重新复制一遍放到新数组中
                         for (HashEntry e = head; e != tail; e = e.next) {
                             int newIndex = e.getHash() & newMask;
                             HashEntry newNext = newTable.get(newIndex);
@@ -570,22 +578,13 @@ public class ConcurrentCache {
                     break;
                 }
 
-                if (map.isDebug && accessQueue.size() != count) {
-                    throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
-                }
+                // accessQueue大小应该与count一致
+                Preconditions.checkArgument(accessQueue.size() == count,"个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
                 if (e.getValue().isAllPersist()) {
                     removeEntry((HashEntry) e, e.getHash());
-
-                    if (map.isDebug && accessQueue.size() != count) {
-                        throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
-                    }
                 } else {
                     recordAccess(e);
-
-                    if (map.isDebug && accessQueue.size() != count) {
-                        throw new RuntimeException("个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
-                    }
                 }
             }
         }
@@ -600,7 +599,9 @@ public class ConcurrentCache {
                 if (e == entry) {
                     // 是否remove后面的，再remove前面的 access 是copied 的？
                     ++modCount;
+                    // 从链表1中删除元素entry，且返回链表2的头节点
                     HashEntry newFirst = removeEntryFromChain(first, entry);
+                    // 将链表2的新的头节点设置到segment的table中
                     tab.set(index, newFirst);
                     count = c; // write-volatile
                     if (map.isDebug) {
@@ -616,7 +617,9 @@ public class ConcurrentCache {
                 throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.key);
             }
             HashEntry newFirst = entry.next;
+            // 从链条1的头节点first开始迭代到需要删除的节点entry
             for (HashEntry e = first; e != entry; e = e.next) {
+                // 拷贝e的属性，并作为链条2的临时头节点
                 newFirst = copyEntry(e, newFirst);
             }
             // 从队列移除
@@ -624,6 +627,12 @@ public class ConcurrentCache {
             return newFirst;
         }
 
+        /**
+         * 返回新的对象，拷贝original的数据，并设置next为newNext
+         * @param original
+         * @param newNext
+         * @return
+         */
         HashEntry copyEntry(HashEntry original, HashEntry newNext) {
             HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.value);
             copyAccessEntry(original, newEntry);
@@ -697,6 +706,10 @@ public class ConcurrentCache {
         void drainRecencyQueue() {
             ReferenceEntry e;
             while ((e = recencyQueue.poll()) != null) {
+                // An entry may be in the recency queue despite it being removed from
+                // the map . This can occur when the entry was concurrently read while a
+                // writer is removing it from the segment or after a clear has removed
+                // all of the segment's entries.
                 if (accessQueue.contains(e)) {
                     accessQueue.add(e);
                 }
@@ -1202,8 +1215,6 @@ public class ConcurrentCache {
             public int getHash() {
                 return 0;
             }
-
-            ;
 
             @Override
             public long getAccessTime() {
