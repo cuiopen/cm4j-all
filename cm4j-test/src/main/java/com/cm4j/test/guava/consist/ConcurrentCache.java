@@ -86,8 +86,6 @@ public class ConcurrentCache {
      */
     private static final int BATCH_TO_COMMIT = 300;
 
-    // TODO debug模式
-    boolean isDebug = true;
 
     /* ---------------- Fields -------------- */
     final CacheLoader<String, AbsReference> loader;
@@ -604,16 +602,15 @@ public class ConcurrentCache {
                     // 将链表2的新的头节点设置到segment的table中
                     tab.set(index, newFirst);
                     count = c; // write-volatile
-                    if (map.isDebug) {
-                        map.logger.warn("缓存[{}]被移除", entry.key);
-                    }
+
+                    map.logger.warn("缓存[{}]被移除", entry.key);
                     return;
                 }
             }
         }
 
         HashEntry removeEntryFromChain(HashEntry first, HashEntry entry) {
-            if (map.isDebug && !accessQueue.contains(entry)) {
+            if (!accessQueue.contains(entry)) {
                 throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.key);
             }
             HashEntry newFirst = entry.next;
@@ -710,6 +707,9 @@ public class ConcurrentCache {
                 // the map . This can occur when the entry was concurrently read while a
                 // writer is removing it from the segment or after a clear has removed
                 // all of the segment's entries.
+
+                // accessQueue有存在对象，则把他加入到accessQueue的尾部
+                // accessQueue的add() 另外一个地方在put()的时候
                 if (accessQueue.contains(e)) {
                     accessQueue.add(e);
                 }
