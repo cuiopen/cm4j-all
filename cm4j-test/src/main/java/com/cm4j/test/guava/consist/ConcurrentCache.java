@@ -565,13 +565,16 @@ public class ConcurrentCache {
         void expireEntries(long now) {
             drainRecencyQueue();
 
+            // 如果缓存isExpire但是没有保存db，这时会不会死循环？
+            // 应该会的，因为peek每次都是获取的第一个。如果第一个没移除下次循环还是它，就死循环了
+            // 所以直接把缓存的生命周期后移，同时如果在遍历时再碰到此对象，则退出遍历
             ReferenceEntry e;
-            int firstHash = 0;
+            ReferenceEntry firstEntry = null;
             while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
-                if (firstHash == 0) {
+                if (firstEntry == null) {
                     // 第一次循环，设置first
-                    firstHash = e.getHash();
-                } else if (e.getHash() == firstHash) {
+                    firstEntry = e;
+                } else if (e == firstEntry) {
                     // 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
                     break;
                 }
