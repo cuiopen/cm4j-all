@@ -72,10 +72,10 @@
 			<artifactId>commons-codec</artifactId>
 		</dependency>
 
-		<dependency>
+		<!--<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
-		</dependency>
+		</dependency>-->
 
 		<!-- test -->
 		<dependency>

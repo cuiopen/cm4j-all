@@ -26,6 +26,7 @@
 		<mail.version>1.4.1</mail.version>
 		<hamcrest.version>1.1</hamcrest.version>
 		<netty.version>3.2.7.Final</netty.version>
+		<freemarker.version>2.3.20</freemarker.version>
 		<google.guava.version>13.0</google.guava.version>
 		<quartz.version>2.0.2</quartz.version>
 		<joda-time.version>2.0</joda-time.version>
@@ -275,6 +276,13 @@
 				<version>${netty.version}</version>
 			</dependency>
 
+            <!-- freemarker -->
+            <dependency>
+                <groupId>org.freemarker</groupId>
+                <artifactId>freemarker</artifactId>
+                <version>${freemarker.version}</version>
+            </dependency>
+
 			<!-- Xmemcached -->
 			<dependency>
 				<groupId>com.googlecode.xmemcached</groupId>
@@ -350,11 +358,11 @@
 				<artifactId>quartz-jboss</artifactId>
 				<version>${quartz.version}</version>
 			</dependency>
-			<dependency>
+			<!--<dependency>
 				<groupId>org.apache.httpcomponents</groupId>
 				<artifactId>httpclient</artifactId>
 				<version>${http-client.version}</version>
-			</dependency>
+			</dependency>-->
 			<dependency>
 				<groupId>net.sf.ehcache</groupId>
 				<artifactId>ehcache-core</artifactId>
