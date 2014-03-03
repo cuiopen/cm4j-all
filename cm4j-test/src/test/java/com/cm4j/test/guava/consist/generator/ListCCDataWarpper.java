@@ -7,14 +7,13 @@ import java.util.Map;
  */
 public class ListCCDataWarpper extends AbsCCDataWarpper {
 
-    protected ListCCDataWarpper(Class pojo) {
-        super(pojo);
-        this.fileName = getPojo().getSimpleName() + "ListCache";
-        this.ftlName = "list.ftl";
+    protected ListCCDataWarpper(Class pojo, Map params) {
+        super(pojo, params);
+        setFileName(getPojo().getSimpleName() + "ListCache");
+        setFtlName("list.ftl");
     }
 
     @Override
     protected void dataModel(Map data) {
-        data.put("map_key", "Integer");
     }
 }

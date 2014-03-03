@@ -7,10 +7,10 @@ import java.util.Map;
  */
 public class MapCCDataWarpper extends AbsCCDataWarpper {
 
-    protected MapCCDataWarpper(Class pojo) {
-        super(pojo);
-        this.fileName = getPojo().getSimpleName() + "MapCache";
-        this.ftlName = "map.ftl";
+    protected MapCCDataWarpper(Class pojo, Map params) {
+        super(pojo, params);
+        setFileName(getPojo().getSimpleName() + "MapCache");
+        setFtlName("map.ftl");
     }
 
     @Override

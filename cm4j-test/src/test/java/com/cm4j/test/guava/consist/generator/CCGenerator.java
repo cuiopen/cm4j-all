@@ -1,6 +1,7 @@
 package com.cm4j.test.guava.consist.generator;
 
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
+import com.google.common.collect.Maps;
 import freemarker.template.Configuration;
 import freemarker.template.DefaultObjectWrapper;
 import freemarker.template.Template;
@@ -46,6 +47,10 @@ public class CCGenerator {
     }
 
     public static void main(String[] args) throws Exception {
-        generateMap(new ListCCDataWarpper(TmpListMultikey.class));
+        // 缓存的构造函数的参数
+        Map params = Maps.newHashMap();
+        params.put("int", "playerId");
+
+        generateMap(new ListCCDataWarpper(TmpListMultikey.class, params));
     }
 }

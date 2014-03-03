@@ -18,14 +18,14 @@ public class ${file_name} extends CacheDefiniens<ListReference<${pojo}>> {
     public ${file_name}() {
     }
 
-    public ${file_name}(int playerId) {
-        super(playerId);
+    public ${file_name}(${constructor_params}) {
+        super(${constructor_values});
     }
 
     @Override
     public ListReference<${pojo}> load(String... params) {
         Preconditions.checkArgument(params.length == 1);
-        HibernateDao<${pojo}, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+        HibernateDao<${pojo}, ${hibernate_key}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(${pojo}.class);
         String hql = "from ${pojo} where id.NPlayerId = ?";
         return new ListReference<${pojo}>(hibernate.findAll(hql, NumberUtils.toInt(params[0])));
