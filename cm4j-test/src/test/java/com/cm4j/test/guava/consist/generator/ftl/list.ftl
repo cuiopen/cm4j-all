@@ -12,7 +12,7 @@ import org.apache.commons.lang.math.NumberUtils;
  * ${comment!'COMMENT HERE'}
  *
 * User: ${author!'AUTHOR'}
-* Date: ${data?string("yyyy-MM-dd HH:mm:ss")}
+* Date: ${date_now?string("yyyy-MM-dd HH:mm:ss")}
  */
 public class ${file_name} extends CacheDefiniens<ListReference<${pojo}>> {
     public ${file_name}() {
@@ -24,10 +24,9 @@ public class ${file_name} extends CacheDefiniens<ListReference<${pojo}>> {
 
     @Override
     public ListReference<${pojo}> load(String... params) {
-        Preconditions.checkArgument(params.length == 1);
+        Preconditions.checkArgument(params.length == ${constructor_params_size});
         HibernateDao<${pojo}, ${hibernate_key}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(${pojo}.class);
-        String hql = "from ${pojo} where id.NPlayerId = ?";
-        return new ListReference<${pojo}>(hibernate.findAll(hql, NumberUtils.toInt(params[0])));
+        return new ListReference<${pojo}>(${hibernate_query});
     }
 }

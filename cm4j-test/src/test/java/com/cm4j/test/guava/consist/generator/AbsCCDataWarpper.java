@@ -1,6 +1,7 @@
 package com.cm4j.test.guava.consist.generator;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Maps;
 import org.apache.commons.lang.StringUtils;
 
 import javax.persistence.EmbeddedId;
@@ -23,10 +24,14 @@ public abstract class AbsCCDataWarpper {
     private String fileName;
     private String ftlName;
     private Map params;
+    private String query;
 
-    protected AbsCCDataWarpper(Class pojo, Map params) {
+    private Map dataModel;
+
+    protected AbsCCDataWarpper(Class pojo, Map params, String query) {
         this.pojo = pojo;
         this.params = params;
+        this.query = query;
 
         // 查找主键类
         Field[] pojoFields = pojo.getDeclaredFields();
@@ -46,26 +51,27 @@ public abstract class AbsCCDataWarpper {
     }
 
     public Map dataModel() {
-        Map data = new HashMap();
-        data.put("package", StringUtils.replaceChars(CCGenerator.packagePath, "/", "."));
-        data.put("author", "yanghao");
-        data.put("data", new Date());
+        if (dataModel == null) {
+            dataModel = Maps.newHashMap();
 
-        data.put("file_name", fileName);
-        data.put("pojo", pojo.getSimpleName());
+            dataModel.put("package", StringUtils.replaceChars(CCGenerator.packagePath, "/", "."));
+            dataModel.put("author", "yanghao");
+            dataModel.put("date_now", new Date());
 
-        // 构造函数参数
-        data.put("constructor_params", Joiner.on(",").withKeyValueSeparator(" ").join(params));
-        data.put("constructor_values", Joiner.on(",").join(params.values()));
+            dataModel.put("file_name", fileName);
+            dataModel.put("pojo", pojo.getSimpleName());
 
-        // hibernate的映射主键
-        data.put("hibernate_key", pojoId.getSimpleName());
+            // 构造函数参数
+            dataModel.put("constructor_params", Joiner.on(",").withKeyValueSeparator(" ").join(params));
+            dataModel.put("constructor_params_size", params.size());
+            dataModel.put("constructor_values", Joiner.on(",").join(params.values()));
 
-        dataModel(data);
-        return data;
+            // hibernate的映射主键
+            dataModel.put("hibernate_key", pojoId.getSimpleName());
+            dataModel.put("hibernate_query", query);
+        }
+        return dataModel;
     }
-
-    protected abstract void dataModel(Map data);
 
     public Class getPojo() {
         return pojo;

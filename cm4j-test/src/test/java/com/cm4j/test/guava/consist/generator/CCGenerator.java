@@ -5,14 +5,10 @@ import com.google.common.collect.Maps;
 import freemarker.template.Configuration;
 import freemarker.template.DefaultObjectWrapper;
 import freemarker.template.Template;
-import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -51,6 +47,14 @@ public class CCGenerator {
         Map params = Maps.newHashMap();
         params.put("int", "playerId");
 
-        generateMap(new ListCCDataWarpper(TmpListMultikey.class, params));
+        String hql = "from TmpListMultikey where id.NPlayerId = ?";
+        String query = "hibernate.findAll((\"" + hql + "\", NumberUtils.toInt(params[0]))";
+        // single
+        // String query = "hibernate.findById(NumberUtils.toInt(params[0])";
+
+        ListCCDataWrapper wrapper = new ListCCDataWrapper(TmpListMultikey.class, params, query);
+        wrapper.dataModel().put("map_key", "Integer");
+
+        generateMap(wrapper);
     }
 }

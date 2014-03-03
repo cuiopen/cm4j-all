@@ -16,7 +16,7 @@ import java.util.Map;
 * ${comment!'COMMENT HERE'}
 *
 * User: ${author!'AUTHOR'}
-* Date: ${data?string("yyyy-MM-dd HH:mm:ss")}
+* Date: ${date_now?string("yyyy-MM-dd HH:mm:ss")}
 */
 public class ${file_name} extends CacheDefiniens<MapReference<${map_key}, ${pojo}>> {
     public ${file_name}() {
@@ -28,16 +28,16 @@ public class ${file_name} extends CacheDefiniens<MapReference<${map_key}, ${pojo
 
     @Override
     public MapReference<${map_key}, ${pojo}> load(String... params) {
-        Preconditions.checkArgument(params.length == 1);
+        Preconditions.checkArgument(params.length == ${constructor_params_size});
         HibernateDao<${pojo}, ${hibernate_key}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(${pojo}.class);
         String hql = "from ${pojo} where id.NPlayerId = ?";
-        List<${pojo}> all = hibernate.findAll(hql, NumberUtils.toInt(params[0]));
+        List<${pojo}> all = ${hibernate_query};
 
         Map<${map_key}, ${pojo}> map = new HashMap<${map_key}, ${pojo}>();
         for (${pojo} entity : all) {
             map.put(entity.getId().getNType(), entity);
         }
-        return new MapReference<${hibernate_key}, ${pojo}>(map);
+        return new MapReference<${map_key}, ${pojo}>(map);
     }
 }
