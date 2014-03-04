@@ -35,6 +35,8 @@ public class CCGenerator {
 
     public static void generateMap(AbsCCDataWarpper wrpper) throws Exception {
         Template template = configure().getTemplate(wrpper.getFtlName());
+
+        // 输出途径
         Writer out = new OutputStreamWriter(System.out);
 //        Writer out = new FileWriter(generatePath + packagePath + "/" + fileName + "2.java");
 
@@ -48,12 +50,15 @@ public class CCGenerator {
         params.put("int", "playerId");
 
         String hql = "from TmpListMultikey where id.NPlayerId = ?";
-        String query = "hibernate.findAll((\"" + hql + "\", NumberUtils.toInt(params[0]))";
+//        String query = "hibernate.findAll((\"" + hql + "\", NumberUtils.toInt(params[0]))";
         // single
-        // String query = "hibernate.findById(NumberUtils.toInt(params[0])";
+        String query = "hibernate.findById(NumberUtils.toInt(params[0])";
 
-        ListCCDataWrapper wrapper = new ListCCDataWrapper(TmpListMultikey.class, params, query);
-        wrapper.dataModel().put("map_key", "Integer");
+        SingleCCDataWrapper wrapper = new SingleCCDataWrapper(TmpListMultikey.class, params, query);
+
+        // map特有的属性
+        wrapper.dataModel().put("entry_key_type", "Integer");
+        wrapper.dataModel().put("entry_key_content", "entry.getId().getNType()");
 
         generateMap(wrapper);
     }

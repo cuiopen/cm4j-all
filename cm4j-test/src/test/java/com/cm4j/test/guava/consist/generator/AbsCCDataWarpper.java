@@ -67,7 +67,7 @@ public abstract class AbsCCDataWarpper {
             dataModel.put("constructor_values", Joiner.on(",").join(params.values()));
 
             // hibernate的映射主键
-            dataModel.put("hibernate_key", pojoId.getSimpleName());
+            dataModel.put("pojo_id_type", pojoId.getSimpleName());
             dataModel.put("hibernate_query", query);
         }
         return dataModel;

@@ -25,7 +25,7 @@ public class ${file_name} extends CacheDefiniens<ListReference<${pojo}>> {
     @Override
     public ListReference<${pojo}> load(String... params) {
         Preconditions.checkArgument(params.length == ${constructor_params_size});
-        HibernateDao<${pojo}, ${hibernate_key}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+        HibernateDao<${pojo}, ${pojo_id_type}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(${pojo}.class);
         return new ListReference<${pojo}>(${hibernate_query});
     }

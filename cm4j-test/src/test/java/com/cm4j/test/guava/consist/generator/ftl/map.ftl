@@ -27,17 +27,16 @@ public class ${file_name} extends CacheDefiniens<MapReference<${map_key}, ${pojo
     }
 
     @Override
-    public MapReference<${map_key}, ${pojo}> load(String... params) {
+    public MapReference<${entry_key_type}, ${pojo}> load(String... params) {
         Preconditions.checkArgument(params.length == ${constructor_params_size});
-        HibernateDao<${pojo}, ${hibernate_key}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+        HibernateDao<${pojo}, ${pojo_id_type}> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(${pojo}.class);
-        String hql = "from ${pojo} where id.NPlayerId = ?";
         List<${pojo}> all = ${hibernate_query};
 
-        Map<${map_key}, ${pojo}> map = new HashMap<${map_key}, ${pojo}>();
-        for (${pojo} entity : all) {
-            map.put(entity.getId().getNType(), entity);
+        Map<${entry_key_type}, ${pojo}> map = new HashMap<${entry_key_type}, ${pojo}>();
+        for (${pojo} entry : all) {
+            map.put(${entry_key_content}, entity);
         }
-        return new MapReference<${map_key}, ${pojo}>(map);
+        return new MapReference<${entry_key_type}, ${pojo}>(map);
     }
 }
