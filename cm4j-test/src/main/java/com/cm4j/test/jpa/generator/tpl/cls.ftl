@@ -3,6 +3,7 @@ package ${packageDir};
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import net.bojoy.king.dao.core.IEntity;
 <#-- 复合主键 -->
 <#if primaryKeySize &gt; 1>
 import javax.persistence.EmbeddedId;
@@ -11,8 +12,6 @@ import javax.persistence.EmbeddedId;
 <#if primaryKeySize == 1>
 import javax.persistence.Id;
 </#if>
-
-import net.bojoy.king.dao.core.IEntity;
 
 /**
 * ${comment!""}
@@ -55,9 +54,10 @@ private ${ID} id;
     <#if column.columnKey == "PRI" && primaryKeySize == 1>@Id</#if>
 <#-- 非主键或者唯一主键 -->
 <#if column.columnKey != "PRI" || primaryKeySize == 1>
-    <#if column.propertyType == "java.util.Date">@javax.persistence.Temporal(javax.persistence.TemporalType
-        <#if column.columnType == "DATE" || column.columnType == "date">.DATE<#else>.TIMESTAMP</#if>)
-    </#if>@Column(name = "${column.columnName}"<#if column.columnSize != 0>, length = ${column.columnSize}</#if><#if column.isNullable == "NO">, nullable = false</#if><#if column.columnKey == "UNI">, unique = true</#if>)
+<#if column.propertyType == "java.util.Date">@javax.persistence.Temporal(javax.persistence.TemporalType
+    <#if column.columnType == "DATE" || column.columnType == "date">.DATE<#else>.TIMESTAMP</#if>)
+</#if>
+    @Column(name = "${column.columnName}"<#--<#if column.columnSize != 0>, length = ${column.columnSize}</#if><#if column.isNullable == "NO">, nullable = false</#if><#if column.columnKey == "UNI">, unique = true</#if>-->)
     public ${column.propertyType} get${column.propertyName?cap_first} (){
         return this.${column.propertyName} ;
     }
