@@ -1,3 +1,7 @@
+<#--
+模板中编码特别容易因为if等模板命令而出现生成出来的空格或回车不复合规范
+因此：尽量把命令贴近第一列编写，不要有tab，回车也要注意使用
+-->
 package ${packageDir};
 
 import javax.persistence.Column;
