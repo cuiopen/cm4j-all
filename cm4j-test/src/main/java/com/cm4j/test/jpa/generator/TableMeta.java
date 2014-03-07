@@ -2,6 +2,7 @@ package com.cm4j.test.jpa.generator;
 
 import org.apache.commons.lang.StringUtils;
 
+import javax.swing.plaf.TreeUI;
 import java.util.List;
 
 /**
@@ -48,7 +49,16 @@ public class TableMeta {
     public String getClassName() {
         if (tableName == null) return "";
         StringBuffer className = new StringBuffer();
-        if (StringUtils.startsWith(tableName, Consts.DB_TABLE_PREFIX)) {
+
+        boolean need = false;
+        if (StringUtils.isNotBlank(Consts.DB_TABLE) && Consts.DB_TABLE.equals(tableName)) {
+            need = true;
+        }
+        if (StringUtils.isBlank(Consts.DB_TABLE) && StringUtils.startsWith(tableName, Consts.DB_TABLE_PREFIX)) {
+            need = true;
+        }
+
+        if (need) {
             String[] names = StringUtils.split(tableName.toLowerCase(), "_");
             for (int i = 0, len = names.length; i < len; i++) {
                 className.append(names[i].substring(0, 1).toUpperCase() + names[i].substring(1));
