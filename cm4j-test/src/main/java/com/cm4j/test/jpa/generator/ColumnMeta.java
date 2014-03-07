@@ -82,7 +82,10 @@ public class ColumnMeta {
     }
 
     public String getColumnComment() {
-        return columnComment;
+        if (StringUtils.isBlank(columnComment)) {
+            return columnComment;
+        }
+        return StringUtils.replace(columnComment, "\n","\n//");
     }
 
     public void setColumnComment(String columnComment) {
@@ -120,16 +123,19 @@ public class ColumnMeta {
         String propertyType = "NOT_FOUND_PROPERTY_TYPE";
         if (StringUtils.startsWith(type, "int")) {                // int/long
             columnSize = NumberUtils.toInt(StringUtils.substring(type, StringUtils.indexOf(type, "(") + 1, StringUtils.indexOf(type, ")")));
-            if (columnSize <= 4) propertyType = "Integer";
-            else propertyType = "Long";
+            if (columnSize <= 4) {
+                propertyType = isNullable.equals("NO") ? "byte" : "Byte";
+            } else {
+                propertyType = isNullable.equals("NO") ? "int" : "Integer";
+            }
         } else if (StringUtils.startsWith(type, "bigint")) {        // long
-            propertyType = "Long";
+            propertyType = isNullable.equals("NO") ? "long" : "Long";
         } else if (StringUtils.startsWith(type, "tinyint")) {        // long
-            propertyType = "Byte";
+            propertyType = isNullable.equals("NO") ? "byte" : "Byte";
         } else if (StringUtils.startsWith(type, "double")) {        // double
-            propertyType = "Double";
+            propertyType = isNullable.equals("NO") ? "double" : "Double";
         } else if (StringUtils.startsWith(type, "float")) {        // float
-            propertyType = "Float";
+            propertyType = isNullable.equals("NO") ? "float" : "Float";
         } else if (StringUtils.startsWith(type, "varchar")) {    // String
             columnSize = NumberUtils.toInt(StringUtils.substring(type, StringUtils.indexOf(type, "(") + 1, StringUtils.indexOf(type, ")")));
             propertyType = "String";

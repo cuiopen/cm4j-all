@@ -19,12 +19,12 @@ public interface Consts {
 
     // 生成代码存放目录
     // king_high
-    String TARGET_DIR = "E:/entity/";
-    //    String TARGET_DIR = "E:\\workspace\\bojoy\\king\\Kinghigh_CODE_Server\\Kinghigh_cn_cn_Server\\branches\\20131024\\src\\java\\net\\bojoy\\king\\dao\\webgame\\entity\\";
+//    String TARGET_DIR = "E:/entity/";
+    String TARGET_DIR = "E:\\workspace\\bojoy\\king\\Kinghigh_CODE_Server\\Kinghigh_cn_cn_Server\\branches\\20131024\\src\\java\\net\\bojoy\\king\\dao\\webgame\\entity\\";
 
     // 表前缀，当DB_TABLE为空时才启用
-    String DB_TABLE_PREFIX = "";
+    String DB_TABLE_PREFIX = "dict_country_city";
     // 表名
-    String DB_TABLE = "dict_country_city";
+    String DB_TABLE = "";
 
 }
