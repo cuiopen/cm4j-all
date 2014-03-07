@@ -27,9 +27,9 @@ public class ${className} implements IEntity {
 <#-- 属性字段 -->
 <#-- 复合主键 -->
 <#if primaryKeySize &gt; 1>
-    <#assign ID = className + "Id">
-// ID
-private ${ID} id;
+<#assign ID = className + "Id">
+    // ID
+    private ${ID} id;
 </#if>
 <#list columns as column>
 <#-- 非主键 或者 主键个数<=1 -->
@@ -46,12 +46,16 @@ private ${ID} id;
     public ${ID} getId(){
         return this.id;
     }
+
     public void setId(${ID} id) {
         this.id = id;
     }
+
 </#if>
 <#list columns as column>
-    <#if column.columnKey == "PRI" && primaryKeySize == 1>@Id</#if>
+<#if column.columnKey == "PRI" && primaryKeySize == 1>
+    @Id
+</#if>
 <#-- 非主键或者唯一主键 -->
 <#if column.columnKey != "PRI" || primaryKeySize == 1>
 <#if column.propertyType == "java.util.Date">@javax.persistence.Temporal(javax.persistence.TemporalType
@@ -65,7 +69,7 @@ private ${ID} id;
     public void set${column.propertyName?cap_first} (${column.propertyType} ${column.propertyName}){
         this.${column.propertyName} = ${column.propertyName} ;
     }
+
 </#if>
 </#list>
-
 }
