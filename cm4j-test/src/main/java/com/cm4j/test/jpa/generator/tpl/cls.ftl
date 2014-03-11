@@ -18,11 +18,11 @@ import javax.persistence.Id;
 </#if>
 
 /**
-* ${comment!""}
-*
-* @desc     代码生成器生成.
-* @date     ${.now?string("yyyy-MM-dd")}
-*/
+ * ${comment!""}
+ *
+ * @desc     代码生成器生成.
+ * @date     ${.now?string("yyyy-MM-dd")}
+ */
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "${tableName}")
@@ -62,8 +62,8 @@ public class ${className} implements IEntity {
 </#if>
 <#-- 非主键或者唯一主键 -->
 <#if column.columnKey != "PRI" || primaryKeySize == 1>
-<#if column.propertyType == "java.util.Date">@javax.persistence.Temporal(javax.persistence.TemporalType
-    <#if column.columnType == "DATE" || column.columnType == "date">.DATE<#else>.TIMESTAMP</#if>)
+<#if column.propertyType == "java.util.Date">
+    @javax.persistence.Temporal(javax.persistence.TemporalType<#if column.columnType == "DATE" || column.columnType == "date">.DATE<#else>.TIMESTAMP</#if>)
 </#if>
     @Column(name = "${column.columnName}"<#--<#if column.columnSize != 0>, length = ${column.columnSize}</#if><#if column.isNullable == "NO">, nullable = false</#if><#if column.columnKey == "UNI">, unique = true</#if>-->)
     public ${column.propertyType} get${column.propertyName?cap_first} (){
