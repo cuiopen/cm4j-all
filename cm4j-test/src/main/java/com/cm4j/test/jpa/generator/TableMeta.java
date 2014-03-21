@@ -2,7 +2,6 @@ package com.cm4j.test.jpa.generator;
 
 import org.apache.commons.lang.StringUtils;
 
-import javax.swing.plaf.TreeUI;
 import java.util.List;
 
 /**
@@ -64,7 +63,7 @@ public class TableMeta {
                 className.append(names[i].substring(0, 1).toUpperCase() + names[i].substring(1));
             }
         } else {
-            System.out.println("==不支持的表前缀:" + tableName + "==");
+//            System.out.println("==不支持的表前缀:" + tableName + "==");
         }
         return className.toString();
     }

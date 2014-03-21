@@ -66,8 +66,10 @@ public class JPA_POJO_Generator {
             idOut.close();
         }
 
-        clsOut.flush();
-        clsOut.close();
+        if (clsOut != null) {
+            clsOut.flush();
+            clsOut.close();
+        }
 
     }
 

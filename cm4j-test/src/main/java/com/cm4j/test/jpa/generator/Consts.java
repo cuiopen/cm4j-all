@@ -23,7 +23,7 @@ public interface Consts {
     String TARGET_DIR = "E:\\workspace\\bojoy\\king\\Kinghigh_CODE_Server\\Kinghigh_cn_cn_Server\\branches\\20131024\\src\\java\\net\\bojoy\\king\\dao\\webgame\\entity\\";
 
     // 表前缀，当DB_TABLE为空时才启用
-    String DB_TABLE_PREFIX = "country_city_info";
+    String DB_TABLE_PREFIX = "player_country_info";
     // 表名
     String DB_TABLE = "";
 
