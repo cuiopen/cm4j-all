@@ -1,4 +1,4 @@
-package com.cm4j.test.jpa.generator;
+package com.cm4j.test.generator.jpa;
 
 import java.sql.Connection;
 import java.sql.DriverManager;

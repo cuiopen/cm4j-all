@@ -1,4 +1,4 @@
-package com.cm4j.test.jpa.generator;
+package com.cm4j.test.generator.jpa;
 
 /**
  * 数据库常量

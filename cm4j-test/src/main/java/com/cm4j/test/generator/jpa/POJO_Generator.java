@@ -1,4 +1,4 @@
-package com.cm4j.test.jpa.generator;
+package com.cm4j.test.generator.jpa;
 
 
 import freemarker.template.Configuration;
@@ -19,7 +19,7 @@ import java.util.List;
  * @author yanghao
  * @date 2013-6-6
  */
-public class JPA_POJO_Generator {
+public class POJO_Generator {
 
     public static void main(String[] args) throws IOException, TemplateException {
 
@@ -36,7 +36,7 @@ public class JPA_POJO_Generator {
         }
 
         Configuration cfg = new Configuration();
-        cfg.setDirectoryForTemplateLoading(new File("src/main/java/com/cm4j/test/jpa/generator/tpl"));
+        cfg.setDirectoryForTemplateLoading(new File("src/main/java/com/cm4j/test/generator/jpa/tpl"));
         cfg.setObjectWrapper(new DefaultObjectWrapper());
 
         Writer idOut = null;
