@@ -1,8 +1,12 @@
 package com.cm4j.test.generator.jpa;
 
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
+
+import java.util.List;
 
 /**
  * 字段结构
@@ -85,7 +89,12 @@ public class ColumnMeta {
         if (StringUtils.isBlank(columnComment)) {
             return columnComment;
         }
-        return StringUtils.replace(columnComment, "\n","\n//");
+        String[] split = StringUtils.split(columnComment, "\n");
+        List<String> result = Lists.newArrayList();
+        for (String s : split) {
+            result.add(" " + StringUtils.trim(s));
+        }
+        return Joiner.on("\n\t//").join(result);
     }
 
     public void setColumnComment(String columnComment) {

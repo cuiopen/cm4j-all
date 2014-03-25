@@ -38,7 +38,7 @@ public class ${className} implements IEntity {
 <#list columns as column>
 <#-- 非主键 或者 主键个数<=1 -->
     <#if column.columnKey != "PRI" || primaryKeySize <= 1>
-    // ${column.columnComment}
+    //${column.columnComment}
     private ${column.propertyType} ${column.propertyName};
     </#if>
 </#list>
