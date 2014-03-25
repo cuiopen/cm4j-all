@@ -26,6 +26,7 @@ public class ${clsName} implements IExtReload {
     @Override
     public void reload() {
         try {
+            data.clear();
             List<${entityName}> all = queryDictDAO.findAll(${entityName}.class);
             for (${entityName} entity : all) {
                 data.put(entity.${idGetterName}(), entity);
@@ -33,6 +34,10 @@ public class ${clsName} implements IExtReload {
         } catch (Exception e) {
             log.error("", e);
         }
+    }
+
+    public static Map<${idType}, ${entityName}> getData() {
+        return data;
     }
 
     public void setQueryDictDAO(IQueryDictDAO queryDictDAO) {
