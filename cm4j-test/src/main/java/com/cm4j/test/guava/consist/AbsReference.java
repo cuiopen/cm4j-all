@@ -124,7 +124,7 @@ public abstract class AbsReference {
     }
 
     /**
-     * 检查deleteSet，如果存在则修改状态
+     * 数据在deleteSet，则状态只能改为P
      *
      * @param entry
      * @param dbState
@@ -133,13 +133,13 @@ public abstract class AbsReference {
      */
     protected boolean checkAndDealDeleteSet(CacheEntry entry, DBState dbState) {
         // deleteSet数据处理
-        Iterator<CacheEntry> itor = getDeletedSet().iterator();
-        while (itor.hasNext()) {
-            CacheEntry v = itor.next();
+        Iterator<CacheEntry> iter = getDeletedSet().iterator();
+        while (iter.hasNext()) {
+            CacheEntry v = iter.next();
             // 进入deleteSet的对象只能被写入，
             if (v == entry) {
                 Preconditions.checkArgument(DBState.P == dbState, "对象被删除后不允许再修改");
-                itor.remove();
+                iter.remove();
                 return true;
             }
         }

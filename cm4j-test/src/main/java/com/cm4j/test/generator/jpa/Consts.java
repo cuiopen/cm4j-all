@@ -25,6 +25,6 @@ public interface Consts {
     // 表前缀，当DB_TABLE为空时才启用
     String DB_TABLE_PREFIX = "";
     // 表名
-    String DB_TABLE = "country_city_info";
+    String DB_TABLE = "dict_country_random_event";
 
 }
