@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.queue;
+package com.cm4j.test.guava.consist.queue;
 
 /**
  * 队列元素

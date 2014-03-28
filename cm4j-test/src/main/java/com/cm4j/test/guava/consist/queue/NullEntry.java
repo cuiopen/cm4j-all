@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.usage.queue;
+package com.cm4j.test.guava.consist.queue;
 
 /**
  * Created by yanghao on 14-3-26.
