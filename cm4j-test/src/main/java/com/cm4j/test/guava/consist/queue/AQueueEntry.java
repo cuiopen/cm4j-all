@@ -3,6 +3,8 @@ package com.cm4j.test.guava.consist.queue;
 import com.google.common.base.Preconditions;
 
 /**
+ * FIFO队列内Entry的封装类
+ *
  * Created by yanghao on 14-3-27.
  */
 public abstract class AQueueEntry<T> implements IQueueEntry {

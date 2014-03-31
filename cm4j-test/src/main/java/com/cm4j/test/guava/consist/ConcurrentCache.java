@@ -51,6 +51,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ConcurrentCache {
 
+    final Constants constants = new Constants();
+
     private static class HOLDER {
         private static final ConcurrentCache instance = new ConcurrentCache(new CacheValueLoader());
     }
@@ -58,38 +60,6 @@ public class ConcurrentCache {
     public static ConcurrentCache getInstance() {
         return HOLDER.instance;
     }
-
-    /* ---------------- Constants -------------- */
-    // 初始化缓存数据个数 默认为16
-    static final int DEFAULT_INITIAL_CAPACITY = 16;
-    // 加载因子
-    static final float DEFAULT_LOAD_FACTOR = 0.75f;
-    // TODO 默认设为16
-    // 默认segment的个数
-    static final int DEFAULT_CONCURRENCY_LEVEL = 1;
-    static final int MAXIMUM_CAPACITY = 1 << 30;
-    static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
-    static final int RETRIES_BEFORE_LOCK = 2;
-
-    // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(500);
-    /**
-     * TODO 更新队列检测间隔，单位s
-     */
-    private static final int CHECK_UPDATE_QUEUE_INTERVAL = 3;
-    /**
-     * 间隔多少次检查，可持久化，总间隔时间也就是 5 * 60s = 5min
-     */
-    private static final int PERSIST_CHECK_INTERVAL = 5;
-    /**
-     * 达到多少个对象，可持久化
-     */
-    private static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
-    /**
-     * 达到多少条则提交给批处理
-     */
-    private static final int BATCH_TO_COMMIT = 300;
-
 
     /* ---------------- Fields -------------- */
     final CacheLoader<String, AbsReference> loader;
@@ -406,12 +376,12 @@ public class ConcurrentCache {
             StopWatch watch = new Slf4JStopWatch();
             AtomicReferenceArray<HashEntry> oldTable = table;
             int oldCapacity = oldTable.length();
-            if (oldCapacity >= MAXIMUM_CAPACITY)
+            if (oldCapacity >= Constants.MAXIMUM_CAPACITY)
                 return;
 
             int newCount = count;
             AtomicReferenceArray<HashEntry> newTable = HashEntry.newArray(oldCapacity << 1);
-            threshold = (int)(newTable.length() * loadFactor);
+            threshold = (int) (newTable.length() * loadFactor);
             int newMask = newTable.length() - 1;
             for (int oldIndex = 0; oldIndex < oldCapacity; ++oldIndex) {
                 // We need to guarantee that any existing reads of old Map can
@@ -551,7 +521,7 @@ public class ConcurrentCache {
                 }
 
                 // accessQueue大小应该与count一致
-                Preconditions.checkArgument(accessQueue.size() == count,"个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
+                Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
                 if (e.getValue().isAllPersist()) {
                     removeEntry(e, e.getHash());
@@ -600,6 +570,7 @@ public class ConcurrentCache {
 
         /**
          * 返回新的对象，拷贝original的数据，并设置next为newNext
+         *
          * @param original
          * @param newNext
          * @return
@@ -634,8 +605,8 @@ public class ConcurrentCache {
          * Performs routine cleanup prior to executing a write. This should be
          * called every time a write thread acquires the segment lock,
          * immediately after acquiring the lock.
-         *
-         * <p>
+         * <p/>
+         * <p/>
          * Post-condition: expireEntries has been run.
          */
         void preWriteCleanup(long now) {
@@ -694,7 +665,7 @@ public class ConcurrentCache {
 	/* ---------------- Public operations -------------- */
 
     private ConcurrentCache(CacheLoader<String, AbsReference> loader) {
-        this(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR, DEFAULT_CONCURRENCY_LEVEL, loader);
+        this(Constants.DEFAULT_INITIAL_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, Constants.DEFAULT_CONCURRENCY_LEVEL, loader);
     }
 
     private ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel,
@@ -704,8 +675,8 @@ public class ConcurrentCache {
 
         this.loader = loader;
 
-        if (concurrencyLevel > MAX_SEGMENTS)
-            concurrencyLevel = MAX_SEGMENTS;
+        if (concurrencyLevel > Constants.MAX_SEGMENTS)
+            concurrencyLevel = Constants.MAX_SEGMENTS;
 
         // Find power-of-two sizes best matching arguments
         int sshift = 0;
@@ -718,8 +689,8 @@ public class ConcurrentCache {
         segmentMask = ssize - 1;
         this.segments = Segment.newArray(ssize);
 
-        if (initialCapacity > MAXIMUM_CAPACITY)
-            initialCapacity = MAXIMUM_CAPACITY;
+        if (initialCapacity > Constants.MAXIMUM_CAPACITY)
+            initialCapacity = Constants.MAXIMUM_CAPACITY;
         int c = initialCapacity / ssize;
         if (c * ssize < initialCapacity)
             ++c;
@@ -741,7 +712,7 @@ public class ConcurrentCache {
             public void run() {
                 consumeUpdateQueue(false);
             }
-        }, 1, CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
+        }, 1, Constants.CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
     }
 
     public int size() {
@@ -751,7 +722,7 @@ public class ConcurrentCache {
         int[] mc = new int[segments.length];
         // Try a few times to get accurate count. On failure due to
         // continuous async changes in table, resort to locking.
-        for (int k = 0; k < RETRIES_BEFORE_LOCK; ++k) {
+        for (int k = 0; k < Constants.RETRIES_BEFORE_LOCK; ++k) {
             check = 0;
             sum = 0;
             int mcsum = 0;
@@ -846,8 +817,7 @@ public class ConcurrentCache {
      * 先持久化再移除
      *
      * @param desc
-     * @param isRemove
-     *         是否移除
+     * @param isRemove 是否移除
      */
     public void persistAndRemove(CacheDefiniens<? extends AbsReference> desc, boolean isRemove) {
         persistAndRemove(desc.getKey(), isRemove);
@@ -857,8 +827,7 @@ public class ConcurrentCache {
      * 持久化
      *
      * @param key
-     * @param isRemove
-     *         是否移除
+     * @param isRemove 是否移除
      */
     public void persistAndRemove(String key, final boolean isRemove) {
         Preconditions.checkNotNull(key, "key不能为null");
@@ -975,8 +944,7 @@ public class ConcurrentCache {
      * 注意：entry必须是在缓存中存在的，且entry.attachedKey都不能为null
      *
      * @param entry
-     * @param dbState
-     *         U or D,不允许P
+     * @param dbState U or D,不允许P
      */
     void changeDbState(final CacheEntry entry, final DBState dbState) {
         StopWatch watch = new Slf4JStopWatch();
@@ -1012,7 +980,7 @@ public class ConcurrentCache {
     }
 
     private boolean isExpired(HashEntry entry, long now) {
-        if (now - entry.getAccessTime() > expireAfterAccessNanos) {
+        if (now - entry.getAccessTime() > constants.expireAfterAccessNanos) {
             return true;
         }
         return false;
@@ -1143,12 +1111,11 @@ public class ConcurrentCache {
     /**
      * 将更新队列发送给db存储<br>
      *
-     * @param doNow
-     *         是否立即写入
+     * @param doNow 是否立即写入
      */
     private void consumeUpdateQueue(boolean doNow) {
         logger.error("定时检测：缓存存储数据队列大小：[{}]", updateQueue.size());
-        if (doNow || updateQueue.size() >= MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % PERSIST_CHECK_INTERVAL == 0) {
+        if (doNow || updateQueue.size() >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % Constants.PERSIST_CHECK_INTERVAL == 0) {
             if (updateQueue.size() == 0) {
                 return;
             }
@@ -1171,7 +1138,7 @@ public class ConcurrentCache {
                 }
 
                 // 达到批处理提交条件或者更新队列为空，则执行批处理
-                if (toBatch.size() > 0 && (toBatch.size() % BATCH_TO_COMMIT == 0 || updateQueue.size() == 0)) {
+                if (toBatch.size() > 0 && (toBatch.size() % Constants.BATCH_TO_COMMIT == 0 || updateQueue.size() == 0)) {
                     try {
                         logger.debug("批处理大小：{}", toBatch.size());
                         batchPersistData(toBatch);
