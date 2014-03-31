@@ -5,13 +5,13 @@ import com.google.common.base.Preconditions;
 /**
  * Created by yanghao on 14-3-27.
  */
-public abstract class AQueueEntry implements IQueueEntry {
+public abstract class AQueueEntry<T> implements IQueueEntry {
 
-    private final Object value;
+    private final T value;
 
     private IQueueEntry nextAccess = NullEntry.INSTANCE, previousAccess = NullEntry.INSTANCE;
 
-    public AQueueEntry(Object value) {
+    public AQueueEntry(T value) {
         Preconditions.checkNotNull(value);
         this.value = value;
     }
@@ -36,7 +36,7 @@ public abstract class AQueueEntry implements IQueueEntry {
         this.previousAccess = previous;
     }
 
-    public Object getValue() {
+    public T getValue() {
         return value;
     }
 

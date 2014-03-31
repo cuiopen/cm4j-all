@@ -6,10 +6,11 @@ import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
+import com.cm4j.test.guava.consist.queue.AQueueEntry;
+import com.cm4j.test.guava.consist.queue.FIFOAccessQueue;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.AbstractSequentialIterator;
 import org.hibernate.HibernateException;
 import org.hibernate.NonUniqueObjectException;
 import org.hibernate.Session;
@@ -22,7 +23,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DataAccessException;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -112,38 +116,31 @@ public class ConcurrentCache {
     }
 
     /* ---------------- Inner Classes -------------- */
-    private final static class HashEntry implements ReferenceEntry {
+    private final static class HashEntry extends AQueueEntry<AbsReference> {
         // HashEntery内对象的final不变性来降低读操作对加锁的需求
         final String key;
         final int hash;
         final HashEntry next;
         volatile AbsReference value;
 
-        @Override
-        public String getKey() {
-            return key;
-        }
-
-        @Override
-        public AbsReference getValue() {
-            return value;
-        }
-
-        @Override
-        public int getHash() {
-            return hash;
-        }
-
-        @Override
-        public ReferenceEntry getNext() {
-            return next;
-        }
-
         HashEntry(String key, int hash, HashEntry next, AbsReference value) {
+            super(value);
             this.key = key;
             this.hash = hash;
             this.next = next;
             this.value = value;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public int getHash() {
+            return hash;
+        }
+
+        public HashEntry getNext() {
+            return next;
         }
 
         static final AtomicReferenceArray<HashEntry> newArray(int i) {
@@ -152,38 +149,12 @@ public class ConcurrentCache {
 
         volatile long accessTime = Long.MAX_VALUE;
 
-        @Override
         public long getAccessTime() {
             return accessTime;
         }
 
-        @Override
         public void setAccessTime(long time) {
             this.accessTime = time;
-        }
-
-        ReferenceEntry nextAccess = nullEntry();
-
-        @Override
-        public ReferenceEntry getNextInAccessQueue() {
-            return nextAccess;
-        }
-
-        @Override
-        public void setNextInAccessQueue(ReferenceEntry next) {
-            this.nextAccess = next;
-        }
-
-        ReferenceEntry previousAccess = nullEntry();
-
-        @Override
-        public ReferenceEntry getPreviousInAccessQueue() {
-            return previousAccess;
-        }
-
-        @Override
-        public void setPreviousInAccessQueue(ReferenceEntry previous) {
-            this.previousAccess = previous;
         }
     }
 
@@ -200,10 +171,10 @@ public class ConcurrentCache {
         final float loadFactor;
 
         // 缓存读取，写入的对象都需要放入recencyQueue
-        final Queue<ReferenceEntry> recencyQueue = new ConcurrentLinkedQueue<ReferenceEntry>();
+        final Queue<HashEntry> recencyQueue = new ConcurrentLinkedQueue<HashEntry>();
         // 真正中缓存的访问顺序
         // accessQueue的大小应该与缓存的size一样大
-        final AccessQueue accessQueue = new AccessQueue();
+        final FIFOAccessQueue<HashEntry> accessQueue = new FIFOAccessQueue();
         final AtomicInteger readCount = new AtomicInteger();
 
         Segment(ConcurrentCache map, int initialCapacity, float lf) {
@@ -568,8 +539,8 @@ public class ConcurrentCache {
             // 如果缓存isExpire但是没有保存db，这时会不会死循环？
             // 应该会的，因为peek每次都是获取的第一个。如果第一个没移除下次循环还是它，就死循环了
             // 所以直接把缓存的生命周期后移，同时如果在遍历时再碰到此对象，则退出遍历
-            ReferenceEntry e;
-            ReferenceEntry firstEntry = null;
+            HashEntry e;
+            HashEntry firstEntry = null;
             while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
                 if (firstEntry == null) {
                     // 第一次循环，设置first
@@ -583,7 +554,7 @@ public class ConcurrentCache {
                 Preconditions.checkArgument(accessQueue.size() == count,"个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
                 if (e.getValue().isAllPersist()) {
-                    removeEntry((HashEntry) e, e.getHash());
+                    removeEntry(e, e.getHash());
                 } else {
                     recordAccess(e);
                 }
@@ -642,10 +613,10 @@ public class ConcurrentCache {
         void copyAccessEntry(HashEntry original, HashEntry newEntry) {
             newEntry.setAccessTime(original.getAccessTime());
 
-            connectAccessOrder(original.getPreviousInAccessQueue(), newEntry);
-            connectAccessOrder(newEntry, original.getNextInAccessQueue());
+            accessQueue.connectAccessOrder(original.getPreviousInAccessQueue(), newEntry);
+            accessQueue.connectAccessOrder(newEntry, original.getNextInAccessQueue());
 
-            nullifyAccessOrder(original);
+            accessQueue.nullifyAccessOrder(original);
         }
 
         /**
@@ -698,13 +669,13 @@ public class ConcurrentCache {
          * 1.记录访问时间<br>
          * 2.增加到访问对列的尾部
          */
-        void recordAccess(ReferenceEntry e) {
+        void recordAccess(HashEntry e) {
             e.setAccessTime(now());
             recencyQueue.add(e);
         }
 
         void drainRecencyQueue() {
-            ReferenceEntry e;
+            HashEntry e;
             while ((e = recencyQueue.poll()) != null) {
                 // An entry may be in the recency queue despite it being removed from
                 // the map . This can occur when the entry was concurrently read while a
@@ -858,16 +829,6 @@ public class ConcurrentCache {
         return (V) segmentFor(hash).put(key, hash, value, false);
     }
 
-    // TODO 临时方法 ,用于test测试
-    @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V put(String key, AbsReference value) {
-        Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
-        Preconditions.checkNotNull(value);
-
-        int hash = rehash(key.hashCode());
-        return (V) segmentFor(hash).put(key, hash, value, false);
-    }
-
     /**
      * 不存在时放入缓存
      */
@@ -917,23 +878,6 @@ public class ConcurrentCache {
                     }
                 }
                 return null;
-            }
-        });
-    }
-
-    public boolean replace(String key, final AbsReference oldValue, final AbsReference newValue) {
-        if (oldValue == null || newValue == null)
-            throw new NullPointerException();
-        int hash = rehash(key.hashCode());
-        return segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
-            @Override
-            public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                boolean replaced = false;
-                if (e != null && oldValue.equals(e.value)) {
-                    replaced = true;
-                    e.value = newValue;
-                }
-                return replaced;
             }
         });
     }
@@ -1067,7 +1011,7 @@ public class ConcurrentCache {
         return System.nanoTime();
     }
 
-    private boolean isExpired(ReferenceEntry entry, long now) {
+    private boolean isExpired(HashEntry entry, long now) {
         if (now - entry.getAccessTime() > expireAfterAccessNanos) {
             return true;
         }
@@ -1081,274 +1025,11 @@ public class ConcurrentCache {
      * @param now
      * @return
      */
-    private boolean isExipredAndAllPersist(ReferenceEntry entry, long now) {
+    private boolean isExipredAndAllPersist(HashEntry entry, long now) {
         if (isExpired(entry, now) && entry.getValue().isAllPersist()) {
             return true;
         }
         return false;
-    }
-
-	/* ---------------- Queue -------------- */
-
-    interface ReferenceEntry {
-        /*
-         * Used by entries that use access order. Access entries are maintained
-		 * in a doubly-linked list. New entries are added at the tail of the
-		 * list at write time; stale entries are expired from the head of the
-		 * list.
-		 * 
-		 * 插入到尾部，过期从首部
-		 */
-
-        String getKey();
-
-        AbsReference getValue();
-
-        int getHash();
-
-        ReferenceEntry getNext();
-
-        /**
-         * Returns the time that this entry was last accessed, in ns.
-         */
-        long getAccessTime();
-
-        /**
-         * Sets the entry access time in ns.
-         */
-        void setAccessTime(long time);
-
-        /**
-         * Returns the next entry in the access queue.
-         */
-        ReferenceEntry getNextInAccessQueue();
-
-        /**
-         * Sets the next entry in the access queue.
-         */
-        void setNextInAccessQueue(ReferenceEntry next);
-
-        /**
-         * Returns the previous entry in the access queue.
-         */
-        ReferenceEntry getPreviousInAccessQueue();
-
-        /**
-         * Sets the previous entry in the access queue.
-         */
-        void setPreviousInAccessQueue(ReferenceEntry previous);
-
-    }
-
-    private enum NullEntry implements ReferenceEntry {
-        INSTANCE;
-
-        @Override
-        public String getKey() {
-            return null;
-        }
-
-        @Override
-        public AbsReference getValue() {
-            return null;
-        }
-
-        @Override
-        public ReferenceEntry getNext() {
-            return null;
-        }
-
-        @Override
-        public int getHash() {
-            return 0;
-        }
-
-        @Override
-        public long getAccessTime() {
-            return 0;
-        }
-
-        @Override
-        public void setAccessTime(long time) {
-        }
-
-        @Override
-        public ReferenceEntry getNextInAccessQueue() {
-            return this;
-        }
-
-        @Override
-        public void setNextInAccessQueue(ReferenceEntry next) {
-        }
-
-        @Override
-        public ReferenceEntry getPreviousInAccessQueue() {
-            return this;
-        }
-
-        @Override
-        public void setPreviousInAccessQueue(ReferenceEntry previous) {
-        }
-
-    }
-
-    // impl never uses a parameter or returns any non-null value
-    static ReferenceEntry nullEntry() {
-        return (ReferenceEntry) NullEntry.INSTANCE;
-    }
-
-    static final class AccessQueue extends AbstractQueue<ReferenceEntry> {
-        final ReferenceEntry head = new ReferenceEntry() {
-
-            @Override
-            public String getKey() {
-                return null;
-            }
-
-            @Override
-            public AbsReference getValue() {
-                return null;
-            }
-
-            @Override
-            public ReferenceEntry getNext() {
-                return nullEntry();
-            }
-
-            public int getHash() {
-                return 0;
-            }
-
-            @Override
-            public long getAccessTime() {
-                return Long.MAX_VALUE;
-            }
-
-            @Override
-            public void setAccessTime(long time) {
-            }
-
-            ReferenceEntry nextAccess = this;
-
-            @Override
-            public ReferenceEntry getNextInAccessQueue() {
-                return nextAccess;
-            }
-
-            @Override
-            public void setNextInAccessQueue(ReferenceEntry next) {
-                this.nextAccess = next;
-            }
-
-            ReferenceEntry previousAccess = this;
-
-            @Override
-            public ReferenceEntry getPreviousInAccessQueue() {
-                return previousAccess;
-            }
-
-            @Override
-            public void setPreviousInAccessQueue(ReferenceEntry previous) {
-                this.previousAccess = previous;
-            }
-        };
-
-        // implements Queue
-
-        @Override
-        public boolean offer(ReferenceEntry entry) {
-            // unlink
-            connectAccessOrder(entry.getPreviousInAccessQueue(), entry.getNextInAccessQueue());
-
-            // add to tail
-            connectAccessOrder(head.getPreviousInAccessQueue(), entry);
-            connectAccessOrder(entry, head);
-
-            return true;
-        }
-
-        @Override
-        public ReferenceEntry peek() {
-            ReferenceEntry next = head.getNextInAccessQueue();
-            return (next == head) ? null : next;
-        }
-
-        @Override
-        public ReferenceEntry poll() {
-            ReferenceEntry next = head.getNextInAccessQueue();
-            if (next == head) {
-                return null;
-            }
-
-            remove(next);
-            return next;
-        }
-
-        @Override
-        public boolean remove(Object o) {
-            ReferenceEntry e = (ReferenceEntry) o;
-            ReferenceEntry previous = e.getPreviousInAccessQueue();
-            ReferenceEntry next = e.getNextInAccessQueue();
-            connectAccessOrder(previous, next);
-            nullifyAccessOrder(e);
-
-            return next != NullEntry.INSTANCE;
-        }
-
-        @Override
-        public boolean contains(Object o) {
-            ReferenceEntry e = (ReferenceEntry) o;
-            return e.getNextInAccessQueue() != NullEntry.INSTANCE;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            return head.getNextInAccessQueue() == head;
-        }
-
-        @Override
-        public int size() {
-            int size = 0;
-            for (ReferenceEntry e = head.getNextInAccessQueue(); e != head; e = e.getNextInAccessQueue()) {
-                size++;
-            }
-            return size;
-        }
-
-        @Override
-        public void clear() {
-            ReferenceEntry e = head.getNextInAccessQueue();
-            while (e != head) {
-                ReferenceEntry next = e.getNextInAccessQueue();
-                nullifyAccessOrder(e);
-                e = next;
-            }
-
-            head.setNextInAccessQueue(head);
-            head.setPreviousInAccessQueue(head);
-        }
-
-        @Override
-        public Iterator<ReferenceEntry> iterator() {
-            return new AbstractSequentialIterator<ReferenceEntry>(peek()) {
-                @Override
-                protected ReferenceEntry computeNext(ReferenceEntry previous) {
-                    ReferenceEntry next = previous.getNextInAccessQueue();
-                    return (next == head) ? null : next;
-                }
-            };
-        }
-    }
-
-    static void connectAccessOrder(ReferenceEntry previous, ReferenceEntry next) {
-        previous.setNextInAccessQueue(next);
-        next.setPreviousInAccessQueue(previous);
-    }
-
-    static void nullifyAccessOrder(ReferenceEntry nulled) {
-        ReferenceEntry nullEntry = nullEntry();
-        nulled.setNextInAccessQueue(nullEntry);
-        nulled.setPreviousInAccessQueue(nullEntry);
     }
 
     static interface SegmentLockHandler<R> {

@@ -121,12 +121,12 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
         };
     }
 
-    void connectAccessOrder(IQueueEntry previous, IQueueEntry next) {
+    public void connectAccessOrder(IQueueEntry previous, IQueueEntry next) {
         previous.setNextInAccessQueue(next);
         next.setPreviousInAccessQueue(previous);
     }
 
-    void nullifyAccessOrder(IQueueEntry nulled) {
+    public void nullifyAccessOrder(IQueueEntry nulled) {
         NullEntry nullEntry = NullEntry.INSTANCE;
         nulled.setNextInAccessQueue(nullEntry);
         nulled.setPreviousInAccessQueue(nullEntry);
