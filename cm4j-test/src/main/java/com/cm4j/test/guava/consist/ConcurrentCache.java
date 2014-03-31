@@ -1065,7 +1065,7 @@ public class ConcurrentCache {
 
             IEntity parseEntity = reference.parseEntity();
             StopWatch watch = new Slf4JStopWatch();
-            if (reference instanceof IEntity && ((IEntity) reference != parseEntity)) {
+            if (reference instanceof IEntity && (reference != parseEntity)) {
                 // 内存地址不同，创建了新对象
                 this.entity = parseEntity;
                 watch.lap("cache.entry.new_object()");
@@ -1074,8 +1074,6 @@ public class ConcurrentCache {
                 try {
                     this.entity = parseEntity.getClass().newInstance();
                     BeanUtils.copyProperties(reference, this.entity);
-                    // this.entity = new
-                    // DeepCopyUtil().deepCopy(reference.parseEntity());
                     watch.lap("cache.entry.property_copy()");
                 } catch (Exception e) {
                     throw new RuntimeException("CacheEntry[" + reference.ref() + "]不能被PropertyCopy", e);
