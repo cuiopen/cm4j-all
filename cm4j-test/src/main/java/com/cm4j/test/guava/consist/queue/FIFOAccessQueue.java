@@ -137,7 +137,7 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
     }
 
     public static void main(String[] args) {
-        FIFOAccessQueue queue = new FIFOAccessQueue();
+        FIFOAccessQueue<AQueueEntry> queue = new FIFOAccessQueue();
         AQueueEntry a = new AQueueEntry("A") {
         };
         AQueueEntry b = new AQueueEntry("B") {
@@ -146,18 +146,18 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
         };
         AQueueEntry d = new AQueueEntry("D") {
         };
-        queue.add(a);
-        queue.add(b);
-        queue.add(c);
+        queue.offer(a);
+        queue.offer(b);
+        queue.offer(c);
+        queue.offer(d);
 
         queue.offer(b);
 
-        System.out.println(queue.size());;
+        System.out.println(queue.size());
 
-        Iterator iterator = queue.iterator();
-        while (iterator.hasNext()) {
-            AQueueEntry next = (AQueueEntry) iterator.next();
-            System.out.println(next.getValue());
+        AQueueEntry e;
+        while ((e = queue.poll()) != null) {
+            System.out.println(e);
         }
     }
 }
