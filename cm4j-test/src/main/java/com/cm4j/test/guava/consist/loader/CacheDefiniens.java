@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.loader;
 
-import com.cm4j.test.guava.consist.AbsReference;
-import com.cm4j.test.guava.consist.ConcurrentCache;
+import com.cm4j.test.guava.consist.cc.AbsReference;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.keys.KEYS;
 import com.cm4j.test.guava.consist.keys.KEYS.JOINER;
 import com.google.common.base.Preconditions;

@@ -3,7 +3,7 @@ package com.cm4j.test.guava.consist.caches;
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;

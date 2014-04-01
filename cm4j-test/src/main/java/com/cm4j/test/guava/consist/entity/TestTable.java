@@ -1,6 +1,6 @@
 package com.cm4j.test.guava.consist.entity;
 
-import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.cc.CacheEntry;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;

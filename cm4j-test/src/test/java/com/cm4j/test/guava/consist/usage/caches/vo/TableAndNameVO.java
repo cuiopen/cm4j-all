@@ -1,6 +1,6 @@
 package com.cm4j.test.guava.consist.usage.caches.vo;
 
-import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.cc.CacheEntry;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.entity.TestTable;
 

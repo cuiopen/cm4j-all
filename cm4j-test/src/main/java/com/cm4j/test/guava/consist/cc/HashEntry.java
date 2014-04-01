@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.fifo.AQueueEntry;
 

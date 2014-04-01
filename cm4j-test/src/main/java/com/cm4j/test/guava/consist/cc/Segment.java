@@ -1,5 +1,6 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.cc;
 
+import com.cm4j.test.guava.consist.Constants;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.google.common.base.Preconditions;

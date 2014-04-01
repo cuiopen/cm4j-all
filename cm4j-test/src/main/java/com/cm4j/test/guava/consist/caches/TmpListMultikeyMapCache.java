@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.caches;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.MapReference;
+import com.cm4j.test.guava.consist.cc.MapReference;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;

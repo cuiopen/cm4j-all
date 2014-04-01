@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.ListReference;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
+import com.cm4j.test.guava.consist.cc.ListReference;
 import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.entity.TmpListMultikeyPK;

@@ -1,5 +1,6 @@
 package com.cm4j.test.guava.consist;
 
+import com.cm4j.test.guava.consist.cc.CacheEntry;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;

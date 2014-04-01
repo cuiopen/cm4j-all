@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.loader;
 
 import org.apache.commons.lang.ArrayUtils;
 
-import com.cm4j.test.guava.consist.AbsReference;
+import com.cm4j.test.guava.consist.cc.AbsReference;
 import com.cm4j.test.guava.consist.keys.KEYS;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;

@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.usage.caches.single;
 
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
+import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.junit.Assert;

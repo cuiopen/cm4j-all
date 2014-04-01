@@ -1,6 +1,6 @@
 package com.cm4j.test.guava.consist.loader;
 
-import com.cm4j.test.guava.consist.AbsReference;
+import com.cm4j.test.guava.consist.cc.AbsReference;
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.caches.TmpListMultikeyMapCache;

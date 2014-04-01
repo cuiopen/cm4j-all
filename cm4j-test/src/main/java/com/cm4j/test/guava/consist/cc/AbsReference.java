@@ -1,6 +1,7 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.dao.hibernate.HibernateDao;
+import com.cm4j.test.guava.consist.DBState;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 

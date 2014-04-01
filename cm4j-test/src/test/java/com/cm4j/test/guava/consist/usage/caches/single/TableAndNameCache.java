@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.usage.caches.single;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TestName;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;

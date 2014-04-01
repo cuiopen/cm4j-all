@@ -6,7 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.cc.CacheEntry;
 
 /**
  * {@link CacheEntry}的ID标识符，基于此标识来获取唯一标识

@@ -1,8 +1,8 @@
 package com.cm4j.test.guava.consist.usage.caches;
 
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.MapReference;
-import com.cm4j.test.guava.consist.SingleReference;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
+import com.cm4j.test.guava.consist.cc.MapReference;
+import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.caches.TmpListMultikeyMapCache;

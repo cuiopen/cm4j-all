@@ -6,8 +6,8 @@ import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.ConcurrentCache;
-import com.cm4j.test.guava.consist.ListReference;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
+import com.cm4j.test.guava.consist.cc.ListReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;

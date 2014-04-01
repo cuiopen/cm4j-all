@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.entity;
 
 // Generated 2013-10-11 18:21:27 by Hibernate Tools 3.4.0.CR1
 
-import com.cm4j.test.guava.consist.CacheEntry;
+import com.cm4j.test.guava.consist.cc.CacheEntry;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
