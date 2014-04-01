@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.cc.persist;
 
 import com.cm4j.test.guava.consist.cc.CacheEntry;
 import com.cm4j.test.guava.consist.entity.IEntity;

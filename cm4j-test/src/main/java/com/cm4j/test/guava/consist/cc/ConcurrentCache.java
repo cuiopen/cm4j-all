@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.test.guava.consist.Constants;
-import com.cm4j.test.guava.consist.DBState;
+import com.cm4j.test.guava.consist.cc.constants.Constants;
+import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 读写分离：
  * 读取：{@link ConcurrentCache}提供get or load、put、expire操作
  *
- * 写入：是由{@link CacheEntry#changeDbState(com.cm4j.test.guava.consist.DBState)}控制对象状态
+ * 写入：是由{@link CacheEntry#changeDbState(com.cm4j.test.guava.consist.cc.persist.DBState)}控制对象状态
  * 同时{@link ConcurrentCache}独立维护了一份写入队列，独立于缓存操作
  *
  * 使用流程：

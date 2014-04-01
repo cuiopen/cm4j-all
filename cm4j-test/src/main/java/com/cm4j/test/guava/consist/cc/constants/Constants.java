@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist;
+package com.cm4j.test.guava.consist.cc.constants;
 
 import java.util.concurrent.TimeUnit;
 

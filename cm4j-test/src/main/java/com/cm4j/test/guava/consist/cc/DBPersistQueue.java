@@ -1,9 +1,9 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.CacheEntryInPersistQueue;
-import com.cm4j.test.guava.consist.Constants;
-import com.cm4j.test.guava.consist.DBState;
+import com.cm4j.test.guava.consist.cc.persist.CacheEntryInPersistQueue;
+import com.cm4j.test.guava.consist.cc.constants.Constants;
+import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import org.hibernate.HibernateException;

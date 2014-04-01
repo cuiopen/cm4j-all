@@ -1,6 +1,6 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.test.guava.consist.DBState;
+import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.keys.Identity;
 import com.google.common.base.Preconditions;
