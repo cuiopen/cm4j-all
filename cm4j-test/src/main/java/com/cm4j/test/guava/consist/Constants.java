@@ -16,7 +16,7 @@ public class Constants {
     public static final int RETRIES_BEFORE_LOCK = 2;
 
     // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    public final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(500);
+    public static final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(500);
     /**
      * TODO 更新队列检测间隔，单位s
      */
