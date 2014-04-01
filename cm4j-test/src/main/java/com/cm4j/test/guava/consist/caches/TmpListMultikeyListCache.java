@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.cc;
+package com.cm4j.test.guava.consist.caches;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.ListReference;

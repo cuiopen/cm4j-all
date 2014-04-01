@@ -10,12 +10,12 @@ import org.springframework.beans.BeanUtils;
  * 读取写入对象：本类中dbState<br>
  * 写入数据：本类中copied
  */
-final class CacheEntryInUpdateQueue {
+public class CacheEntryInPersistQueue {
     private final CacheEntry reference;
     private final DBState dbState;
     private final IEntity entity;
 
-    CacheEntryInUpdateQueue(CacheEntry reference) {
+    public CacheEntryInPersistQueue(CacheEntry reference) {
         this.reference = reference;
         this.dbState = reference.getDbState();
 

@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist;
 
 import com.cm4j.test.guava.consist.loader.CacheLoader;
-import com.cm4j.test.guava.consist.queue.FIFOAccessQueue;
+import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.google.common.base.Preconditions;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
@@ -65,8 +65,8 @@ final class Segment extends ReentrantLock implements Serializable {
     }
 
     HashEntry getEntry(String key, int hash) {
-        for (HashEntry e = getFirst(hash); e != null; e = e.next) {
-            if (e.hash == hash && key.equals(e.key)) {
+        for (HashEntry e = getFirst(hash); e != null; e = e.getNext()) {
+            if (e.getHash() == hash && key.equals(e.getKey())) {
                 return e;
             }
         }
@@ -147,7 +147,7 @@ final class Segment extends ReentrantLock implements Serializable {
             int index = hash & (table.length() - 1);
             HashEntry first = table.get(index);
 
-            for (e = first; e != null; e = e.next) {
+            for (e = first; e != null; e = e.getNext()) {
                 String entryKey = e.getKey();
                 if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
                     value = e.getValue();
@@ -236,14 +236,14 @@ final class Segment extends ReentrantLock implements Serializable {
             int index = hash & (tab.length() - 1);
             HashEntry first = tab.get(index);
             HashEntry e = first;
-            while (e != null && (e.hash != hash || !key.equals(e.key)))
-                e = e.next;
+            while (e != null && (e.getHash() != hash || !key.equals(e.getKey())))
+                e = e.getNext();
 
             AbsReference oldValue;
             if (e != null) {
-                oldValue = e.value;
+                oldValue = e.getValue();
                 if (!onlyIfAbsent) {
-                    e.value = value;
+                    e.setValue(value);
                     recordAccess(e);
                 }
             } else {
@@ -286,7 +286,7 @@ final class Segment extends ReentrantLock implements Serializable {
             HashEntry head = oldTable.get(oldIndex);
 
             if (head != null) {
-                HashEntry next = head.next;
+                HashEntry next = head.getNext();
                 int headIndex = head.getHash() & newMask;
 
                 // next为空代表这个链表就只有一个元素，直接把这个元素设置到新数组中
@@ -297,7 +297,7 @@ final class Segment extends ReentrantLock implements Serializable {
                     HashEntry tail = head;
                     int tailIndex = headIndex;
                     // 从head开始，一直到链条末尾，找到最后一个下标与head下标不一致的元素
-                    for (HashEntry e = next; e != null; e = e.next) {
+                    for (HashEntry e = next; e != null; e = e.getNext()) {
                         int newIndex = e.getHash() & newMask;
                         // 这里的找到后没有退出循环，继续找下一个不一致的下标
                         if (newIndex != tailIndex) {
@@ -309,7 +309,7 @@ final class Segment extends ReentrantLock implements Serializable {
                     newTable.set(tailIndex, tail);
 
                     // 在这之前的元素下标有可能一样，也有可能不一样，所以把前面的元素重新复制一遍放到新数组中
-                    for (HashEntry e = head; e != tail; e = e.next) {
+                    for (HashEntry e = head; e != tail; e = e.getNext()) {
                         int newIndex = e.getHash() & newMask;
                         HashEntry newNext = newTable.get(newIndex);
                         HashEntry newFirst = copyEntry(e, newNext);
@@ -339,7 +339,7 @@ final class Segment extends ReentrantLock implements Serializable {
             HashEntry e = getEntry(key, hash);
             AbsReference oldValue = null;
             if (e != null) {
-                AbsReference v = e.value;
+                AbsReference v = e.getValue();
                 if (value == null || value.equals(v)) {
                     oldValue = v;
                     removeEntry(e, e.getHash());
@@ -374,8 +374,8 @@ final class Segment extends ReentrantLock implements Serializable {
         preWriteCleanup(now());
         try {
             HashEntry e = getFirst(hash);
-            while (e != null && (e.hash != hash || !key.equals(e.key)))
-                e = e.next;
+            while (e != null && (e.getHash() != hash || !key.equals(e.getKey())))
+                e = e.getNext();
 
             return handler.doInSegmentUnderLock(this, e);
         } finally {
@@ -434,7 +434,7 @@ final class Segment extends ReentrantLock implements Serializable {
         int index = hash & (tab.length() - 1);
         HashEntry first = tab.get(index);
 
-        for (HashEntry e = first; e != null; e = e.next) {
+        for (HashEntry e = first; e != null; e = e.getNext()) {
             if (e == entry) {
                 // 是否remove后面的，再remove前面的 access 是copied 的？
                 ++modCount;
@@ -444,7 +444,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 tab.set(index, newFirst);
                 count = c; // write-volatile
 
-                logger.warn("缓存[{}]被移除", entry.key);
+                logger.warn("缓存[{}]被移除", entry.getKey());
                 return;
             }
         }
@@ -452,11 +452,11 @@ final class Segment extends ReentrantLock implements Serializable {
 
     HashEntry removeEntryFromChain(HashEntry first, HashEntry entry) {
         if (!accessQueue.contains(entry)) {
-            throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.key);
+            throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.getKey());
         }
-        HashEntry newFirst = entry.next;
+        HashEntry newFirst = entry.getNext();
         // 从链条1的头节点first开始迭代到需要删除的节点entry
-        for (HashEntry e = first; e != entry; e = e.next) {
+        for (HashEntry e = first; e != entry; e = e.getNext()) {
             // 拷贝e的属性，并作为链条2的临时头节点
             newFirst = copyEntry(e, newFirst);
         }
@@ -473,7 +473,7 @@ final class Segment extends ReentrantLock implements Serializable {
      * @return
      */
     HashEntry copyEntry(HashEntry original, HashEntry newNext) {
-        HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.value);
+        HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.getValue());
         copyAccessEntry(original, newEntry);
         return newEntry;
     }

@@ -1,28 +1,20 @@
 package com.cm4j.test.guava.consist;
 
-import com.cm4j.dao.hibernate.HibernateDao;
-import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
-import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import org.hibernate.HibernateException;
-import org.hibernate.NonUniqueObjectException;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -43,6 +35,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class ConcurrentCache {
 
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
     private static class HOLDER {
         private static final ConcurrentCache instance = new ConcurrentCache(new CacheValueLoader());
     }
@@ -57,9 +51,8 @@ public class ConcurrentCache {
     final int segmentShift;
     final Segment[] segments;
 
-    private final ConcurrentLinkedQueue<CacheEntryInUpdateQueue> updateQueue;
     private final ScheduledExecutorService service;
-    private final Logger logger = LoggerFactory.getLogger(getClass());
+    private final DBPersistQueue persistQueue;
 
     /* ---------------- Small Utilities -------------- */
     private static int rehash(int h) {
@@ -83,13 +76,16 @@ public class ConcurrentCache {
 
     private ConcurrentCache(int initialCapacity, float loadFactor, int concurrencyLevel,
                             CacheLoader<String, AbsReference> loader) {
-        if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null)
+        if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null) {
             throw new IllegalArgumentException();
+        }
 
         this.loader = loader;
+        this.persistQueue = new DBPersistQueue();
 
-        if (concurrencyLevel > Constants.MAX_SEGMENTS)
+        if (concurrencyLevel > Constants.MAX_SEGMENTS) {
             concurrencyLevel = Constants.MAX_SEGMENTS;
+        }
 
         // Find power-of-two sizes best matching arguments
         int sshift = 0;
@@ -115,15 +111,12 @@ public class ConcurrentCache {
             this.segments[i] = new Segment(this, cap, loadFactor);
         }
 
-        // 更新队列
-        updateQueue = new ConcurrentLinkedQueue<CacheEntryInUpdateQueue>();
-
         // 定时处理器
         service = Executors.newScheduledThreadPool(1);
         service.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                consumeUpdateQueue(false);
+                persistQueue.consumePersistQueue(false);
             }
         }, 1, Constants.CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
     }
@@ -250,11 +243,11 @@ public class ConcurrentCache {
         segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.value != null && !e.value.isAllPersist()) {
+                if (e != null && e.getValue() != null && !e.getValue().isAllPersist()) {
                     // deleteSet数据保存
-                    e.value.persistDeleteSet();
+                    e.getValue().persistDeleteSet();
                     // 非deleteSet数据保存
-                    e.value.persistDB();
+                    e.getValue().persistDB();
                     if (isRemove) {
                         segment.removeEntry(e, hash);
                     }
@@ -326,7 +319,7 @@ public class ConcurrentCache {
      * @param entry
      * @return 是否成功修改
      */
-    private boolean changeDbStatePersist(final CacheEntry entry) {
+    boolean changeDbStatePersist(final CacheEntry entry) {
         StopWatch watch = new Slf4JStopWatch();
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
 
@@ -335,12 +328,12 @@ public class ConcurrentCache {
         boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
             @Override
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.value != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getValue() != null && !isExipredAndAllPersist(e, Segment.now())) {
                     // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
                     if (entry.getNumInUpdateQueue().get() != 0) {
                         return false;
                     }
-                    if (e.value.changeDbState(entry, DBState.P)) {
+                    if (e.getValue().changeDbState(entry, DBState.P)) {
                         return true;
                     }
                 }
@@ -372,9 +365,9 @@ public class ConcurrentCache {
         segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.value != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getValue() != null && !isExipredAndAllPersist(e, Segment.now())) {
                     // 更改CacheEntry的状态
-                    if (e.value.changeDbState(entry, dbState)) {
+                    if (e.getValue().changeDbState(entry, dbState)) {
                         return null;
                     } else {
                         throw new RuntimeException("缓存[" + key + "]更改状态失败");
@@ -423,10 +416,7 @@ public class ConcurrentCache {
      * @param entry
      */
     void sendToUpdateQueue(CacheEntry entry) {
-        StopWatch watch = new Slf4JStopWatch();
-        entry.getNumInUpdateQueue().incrementAndGet();
-        updateQueue.add(new CacheEntryInUpdateQueue(entry));
-        watch.stop("cache.sendToUpdateQueue()");
+        persistQueue.sendToPersistQueue(entry);
     }
 
     // 缓存关闭标识
@@ -442,7 +432,7 @@ public class ConcurrentCache {
         Future<?> future = service.submit(new Runnable() {
             @Override
             public void run() {
-                consumeUpdateQueue(true);
+                persistQueue.consumePersistQueue(true);
             }
         });
         try {
@@ -459,117 +449,11 @@ public class ConcurrentCache {
     }
 
     /**
-     * 更新队列消费计数器
-     */
-    private long counter = 0L;
-
-    /**
      * 将更新队列发送给db存储<br>
      *
      * @param doNow 是否立即写入
      */
     private void consumeUpdateQueue(boolean doNow) {
-        logger.error("定时检测：缓存存储数据队列大小：[{}]", updateQueue.size());
-        if (doNow || updateQueue.size() >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (counter++) % Constants.PERSIST_CHECK_INTERVAL == 0) {
-            if (updateQueue.size() == 0) {
-                return;
-            }
-            logger.debug("缓存存储数据开始");
-
-            CacheEntryInUpdateQueue wrapper = null;
-
-            List<CacheEntryInUpdateQueue> toBatch = new ArrayList<CacheEntryInUpdateQueue>();
-            while ((wrapper = updateQueue.poll()) != null) {
-                final StopWatch watch = new Slf4JStopWatch();
-
-                CacheEntry reference = wrapper.getReference();
-                int num = reference.getNumInUpdateQueue().decrementAndGet();
-                // 删除或者更新的num为0
-                if (num == 0) {
-                    IEntity entity = wrapper.getEntity();
-                    if (entity != null && DBState.P != wrapper.getDbState()) {
-                        toBatch.add(wrapper);
-                    }
-                }
-
-                // 达到批处理提交条件或者更新队列为空，则执行批处理
-                if (toBatch.size() > 0 && (toBatch.size() % Constants.BATCH_TO_COMMIT == 0 || updateQueue.size() == 0)) {
-                    try {
-                        logger.debug("批处理大小：{}", toBatch.size());
-                        batchPersistData(toBatch);
-                    } catch (Exception e) {
-                        logger.error("缓存批处理异常", e);
-                    }
-                    toBatch.clear();
-                }
-                watch.stop("cache.loopUpdateQueue()");
-            }
-        }
-    }
-
-    /**
-     * 批处理写入数据
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void batchPersistData(Collection<CacheEntryInUpdateQueue> entities) {
-        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-        Session session = hibernate.getSession();
-        Transaction tx = session.beginTransaction();
-        try {
-            int idx = 0;
-
-            for (CacheEntryInUpdateQueue wrapper : entities) {
-                DBState dbState = wrapper.getDbState();
-                IEntity entity = wrapper.getEntity();
-
-                if (DBState.U == dbState) {
-                    session.merge(entity);
-                } else if (DBState.D == dbState) {
-                    // 为什么会有相同ID的对象进行删除，会报错
-                    // 是否是对象被删除了，然后又新建了一个，然后又被删除了
-                    // 因此在下面的exception中有此处理
-                    session.delete(entity);
-                }
-                if ((++idx) % 50 == 0) {
-                    session.flush(); // 清理缓存，执行批量插入20条记录的SQL insert语句
-                    session.clear(); // 清空缓存中的Customer对象
-                }
-            }
-            // 提交
-            tx.commit();
-            for (CacheEntryInUpdateQueue wrapper : entities) {
-                // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                changeDbStatePersist(wrapper.getReference());
-            }
-        } catch (HibernateException exception) {
-            tx.rollback();
-            if (!(exception instanceof NonUniqueObjectException)) {
-                // 在删除时，如果同一个key的不同对象删除，会报NonUniqueObjectException，但这种情况比较少
-                // 可以参考：http://stackoverflow.com/questions/6518567/org-hibernate-nonuniqueobjectexception
-                logger.error("缓存批处理写入DB异常", exception);
-            }
-            for (CacheEntryInUpdateQueue wrapper : entities) {
-                try {
-                    DBState dbState = wrapper.getDbState();
-                    IEntity entity = wrapper.getEntity();
-
-                    if (DBState.U == dbState) {
-                        hibernate.saveOrUpdate(entity);
-                    } else if (DBState.D == dbState) {
-                        hibernate.delete(entity);
-                    }
-                    // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                    changeDbStatePersist(wrapper.getReference());
-                } catch (DataAccessException e1) {
-                    logger.error("批处理失败，单条更新失败", e1);
-                }
-            }
-        } finally {
-            try {
-                session.close();
-            } catch (HibernateException e) {
-                logger.error("批处理失败，session.close()异常", e);
-            }
-        }
+        persistQueue.consumePersistQueue(doNow);
     }
 }

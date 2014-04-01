@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.usage.caches.list;
 
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.ListReference;
-import com.cm4j.test.guava.consist.cc.TmpListMultikeyListCache;
+import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.entity.TmpListMultikeyPK;
 import org.junit.Assert;

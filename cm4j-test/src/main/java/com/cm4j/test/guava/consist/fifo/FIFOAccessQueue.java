@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.queue;
+package com.cm4j.test.guava.consist.fifo;
 
 import com.google.common.collect.AbstractSequentialIterator;
 

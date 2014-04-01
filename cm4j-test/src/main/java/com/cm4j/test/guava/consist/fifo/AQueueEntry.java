@@ -1,4 +1,4 @@
-package com.cm4j.test.guava.consist.queue;
+package com.cm4j.test.guava.consist.fifo;
 
 import com.google.common.base.Preconditions;
 
@@ -9,7 +9,14 @@ import com.google.common.base.Preconditions;
  */
 public abstract class AQueueEntry<T> implements IQueueEntry {
 
-    private final T value;
+    /**
+     * Q:这里value为啥要是volatile?
+     * A:是为了读取的一致性
+     * Q:那设值通过构造函数，如果保证读到的不是null值？通过setter方法为什么不加同步？
+     * A:因为HashEntry的操作都是在Segment锁下，
+     * 具体解释参考：JDK {@link java.util.concurrent.ConcurrentHashMap.HashEntry}
+     */
+    private volatile T value;
 
     private IQueueEntry nextAccess = NullEntry.INSTANCE, previousAccess = NullEntry.INSTANCE;
 
@@ -40,6 +47,10 @@ public abstract class AQueueEntry<T> implements IQueueEntry {
 
     public T getValue() {
         return value;
+    }
+
+    public void setValue(T value) {
+        this.value = value;
     }
 
     @Override

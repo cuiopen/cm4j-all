@@ -24,7 +24,7 @@ public class CCGenerator {
     // 生成目录
     public static String generatePath = "E:/workspace/cm4j-all/cm4j-test/src/main/java/";
     // 生成包路径
-    public static String packagePath = "com/cm4j/test/guava/consist/cc";
+    public static String packagePath = "com/cm4j/test/guava/consist/caches";
 
     public static Configuration configure() throws Exception {
         Configuration cfg = new Configuration();

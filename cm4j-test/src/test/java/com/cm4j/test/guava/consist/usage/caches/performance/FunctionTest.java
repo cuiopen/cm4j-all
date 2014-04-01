@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.usage.caches.performance;
 
 import com.cm4j.test.guava.consist.ConcurrentCache;
 import com.cm4j.test.guava.consist.SingleReference;
-import com.cm4j.test.guava.consist.cc.TmpFhhdCache;
+import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
