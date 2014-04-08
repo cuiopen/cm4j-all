@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 2.定义映射{@link PrefixMappping}
  * </pre>
  *
- * @author Yang.hao
+ * @author yanghao
  * @since 2013-1-30 上午11:25:47
  */
 public class ConcurrentCache {
@@ -121,48 +121,6 @@ public class ConcurrentCache {
                 persistQueue.consumePersistQueue(false);
             }
         }, 1, Constants.CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
-    }
-
-    public int size() {
-        final Segment[] segments = this.segments;
-        long sum = 0;
-        long check = 0;
-        int[] mc = new int[segments.length];
-        // Try a few times to get accurate count. On failure due to
-        // continuous async changes in table, resort to locking.
-        for (int k = 0; k < Constants.RETRIES_BEFORE_LOCK; ++k) {
-            check = 0;
-            sum = 0;
-            int mcsum = 0;
-            for (int i = 0; i < segments.length; ++i) {
-                sum += segments[i].count;
-                mcsum += mc[i] = segments[i].modCount;
-            }
-            if (mcsum != 0) {
-                for (int i = 0; i < segments.length; ++i) {
-                    check += segments[i].count;
-                    if (mc[i] != segments[i].modCount) {
-                        check = -1; // force retry
-                        break;
-                    }
-                }
-            }
-            if (check == sum)
-                break;
-        }
-        if (check != sum) { // Resort to locking all segments
-            sum = 0;
-            for (int i = 0; i < segments.length; ++i)
-                segments[i].lock();
-            for (int i = 0; i < segments.length; ++i)
-                sum += segments[i].count;
-            for (int i = 0; i < segments.length; ++i)
-                segments[i].unlock();
-        }
-        if (sum > Integer.MAX_VALUE)
-            return Integer.MAX_VALUE;
-        else
-            return (int) sum;
     }
 
     @SuppressWarnings("unchecked")
@@ -278,6 +236,48 @@ public class ConcurrentCache {
     public void clear() {
         for (int i = 0; i < segments.length; ++i)
             segments[i].clear();
+    }
+
+    public int size() {
+        final Segment[] segments = this.segments;
+        long sum = 0;
+        long check = 0;
+        int[] mc = new int[segments.length];
+        // Try a few times to get accurate count. On failure due to
+        // continuous async changes in table, resort to locking.
+        for (int k = 0; k < Constants.RETRIES_BEFORE_LOCK; ++k) {
+            check = 0;
+            sum = 0;
+            int mcsum = 0;
+            for (int i = 0; i < segments.length; ++i) {
+                sum += segments[i].count;
+                mcsum += mc[i] = segments[i].modCount;
+            }
+            if (mcsum != 0) {
+                for (int i = 0; i < segments.length; ++i) {
+                    check += segments[i].count;
+                    if (mc[i] != segments[i].modCount) {
+                        check = -1; // force retry
+                        break;
+                    }
+                }
+            }
+            if (check == sum)
+                break;
+        }
+        if (check != sum) { // Resort to locking all segments
+            sum = 0;
+            for (int i = 0; i < segments.length; ++i)
+                segments[i].lock();
+            for (int i = 0; i < segments.length; ++i)
+                sum += segments[i].count;
+            for (int i = 0; i < segments.length; ++i)
+                segments[i].unlock();
+        }
+        if (sum > Integer.MAX_VALUE)
+            return Integer.MAX_VALUE;
+        else
+            return (int) sum;
     }
 
     public boolean containsKey(String key) {
@@ -417,7 +417,7 @@ public class ConcurrentCache {
      *
      * @param entry
      */
-    void sendToUpdateQueue(CacheEntry entry) {
+    void sendToPersistQueue(CacheEntry entry) {
         persistQueue.sendToPersistQueue(entry);
     }
 
@@ -448,14 +448,5 @@ public class ConcurrentCache {
 
         watch.stop();
         logger.error("stop()运行时间:{}ms", watch.elapsedMillis());
-    }
-
-    /**
-     * 将更新队列发送给db存储<br>
-     *
-     * @param doNow 是否立即写入
-     */
-    private void consumeUpdateQueue(boolean doNow) {
-        persistQueue.consumePersistQueue(doNow);
     }
 }

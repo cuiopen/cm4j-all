@@ -67,7 +67,7 @@ public abstract class CacheEntry {
 	protected void changeDbState(DBState dbState) {
 		setDbState(dbState);
 		if (DBState.P != dbState) {
-			ConcurrentCache.getInstance().sendToUpdateQueue(this);
+			ConcurrentCache.getInstance().sendToPersistQueue(this);
 		}
 	}
 

@@ -109,7 +109,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
                 }
                 entry.setDbState(DBState.P);
                 // 占位：发送到更新队列，状态P
-                ConcurrentCache.getInstance().sendToUpdateQueue(entry);
+                ConcurrentCache.getInstance().sendToPersistQueue(entry);
             }
         }
     }

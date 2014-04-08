@@ -119,7 +119,7 @@ public abstract class AbsReference {
             hibernate.delete(v);
             changeDbState(v, DBState.P);
             // 占位：发送到更新队列，状态P
-            ConcurrentCache.getInstance().sendToUpdateQueue(v);
+            ConcurrentCache.getInstance().sendToPersistQueue(v);
         }
         getDeletedSet().clear();
     }

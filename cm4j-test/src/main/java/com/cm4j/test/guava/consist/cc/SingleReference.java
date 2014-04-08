@@ -100,7 +100,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
             changeDbState(this.v, DBState.P);
             // entry.setDbState(DBState.P);
             // 占位：发送到更新队列，状态P
-            ConcurrentCache.getInstance().sendToUpdateQueue(this.v);
+            ConcurrentCache.getInstance().sendToPersistQueue(this.v);
         }
     }
 
