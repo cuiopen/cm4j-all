@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class DBPersistQueue {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    public final ConcurrentLinkedQueue<CacheEntryInPersistQueue> queue;
+    private final ConcurrentLinkedQueue<CacheEntryInPersistQueue> queue;
 
     /**
      * 更新队列消费计数器

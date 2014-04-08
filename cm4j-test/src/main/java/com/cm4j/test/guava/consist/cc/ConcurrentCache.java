@@ -110,7 +110,7 @@ public class ConcurrentCache {
             cap <<= 1;
 
         for (int i = 0; i < this.segments.length; ++i) {
-            this.segments[i] = new Segment(this, cap, loadFactor);
+            this.segments[i] = new Segment(cap, loadFactor);
         }
 
         // 定时处理器
@@ -310,6 +310,7 @@ public class ConcurrentCache {
 
     public void persist() {
         // TODO 立即保存所有对象 待实现
+        throw new RuntimeException("not implemented");
     }
 
 	/* ---------------- 内部方法 -------------- */

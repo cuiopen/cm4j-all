@@ -26,7 +26,6 @@ final class Segment extends ReentrantLock implements Serializable {
     private static final long serialVersionUID = 2249069246763182397L;
     // 作为位操作的mask，必须是(2^n)-1
     private static final int DRAIN_THRESHOLD = 0x3F;
-    private final ConcurrentCache map;
 
     transient volatile int count;
     transient int modCount;
@@ -35,14 +34,16 @@ final class Segment extends ReentrantLock implements Serializable {
     final float loadFactor;
 
     // 缓存读取，写入的对象都需要放入recencyQueue
+    // 为什么要有recencyQueue？
+    // 因为accessQueue是非线程安全的，如果直接在recordAccess()里面调用accessQueue，则线程不安全
+    // 因此增加一个线程安全的recencyQueue来保证线程的安全性，
     final Queue<HashEntry> recencyQueue = new ConcurrentLinkedQueue<HashEntry>();
     // 真正中缓存的访问顺序
     // accessQueue的大小应该与缓存的size一样大
     final FIFOAccessQueue<HashEntry> accessQueue = new FIFOAccessQueue();
     final AtomicInteger readCount = new AtomicInteger();
 
-    Segment(ConcurrentCache map, int initialCapacity, float lf) {
-        this.map = map;
+    Segment(int initialCapacity, float lf) {
         loadFactor = lf;
         setTable(HashEntry.newArray(initialCapacity));
     }
@@ -552,7 +553,6 @@ final class Segment extends ReentrantLock implements Serializable {
             // all of the segment's entries.
 
             // accessQueue有存在对象，则把他加入到accessQueue的尾部
-            // accessQueue的add() 另外一个地方在put()的时候
             if (accessQueue.contains(e)) {
                 accessQueue.add(e);
             }
