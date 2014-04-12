@@ -1,13 +1,13 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.test.guava.consist.fifo.AQueueEntry;
+import com.cm4j.test.guava.consist.fifo.FIFOEntry;
 
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
 * Created by yanghao on 14-3-31.
 */
-final class HashEntry extends AQueueEntry<AbsReference> {
+final class HashEntry extends FIFOEntry<AbsReference> {
 
     volatile long accessTime = Long.MAX_VALUE;
 

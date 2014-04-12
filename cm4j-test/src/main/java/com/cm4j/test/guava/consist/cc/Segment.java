@@ -78,7 +78,7 @@ final class Segment extends ReentrantLock implements Serializable {
     AbsReference getLiveValue(String key, int hash, long now) {
         HashEntry e = getLiveEntry(key, hash, now);
         if (e != null) {
-            return e.getValue();
+            return e.getQueueEntry();
         }
         return null;
     }
@@ -99,7 +99,7 @@ final class Segment extends ReentrantLock implements Serializable {
             // 如果状态不是P，则会延迟生命周期
             tryExpireEntries(now);
             // 非精准查询，如果延长生命周期，这里依然返回null，get()调用时需在有锁情况下做二次检测
-            if (e.getValue().isAllPersist()) {
+            if (e.getQueueEntry().isAllPersist()) {
                 return null;
             }
         }
@@ -152,7 +152,7 @@ final class Segment extends ReentrantLock implements Serializable {
             for (e = first; e != null; e = e.getNext()) {
                 String entryKey = e.getKey();
                 if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
-                    value = e.getValue();
+                    value = e.getQueueEntry();
 
                     if (value != null && !(isExpired(e, now) && !value.isAllPersist())) {
                         recordAccess(e);
@@ -243,9 +243,9 @@ final class Segment extends ReentrantLock implements Serializable {
 
             AbsReference oldValue;
             if (e != null) {
-                oldValue = e.getValue();
+                oldValue = e.getQueueEntry();
                 if (!onlyIfAbsent) {
-                    e.setValue(value);
+                    e.setQueueEntry(value);
                     recordAccess(e);
                 }
             } else {
@@ -341,7 +341,7 @@ final class Segment extends ReentrantLock implements Serializable {
             HashEntry e = getEntry(key, hash);
             AbsReference oldValue = null;
             if (e != null) {
-                AbsReference v = e.getValue();
+                AbsReference v = e.getQueueEntry();
                 if (value == null || value.equals(v)) {
                     oldValue = v;
                     removeEntry(e, e.getHash());
@@ -422,7 +422,7 @@ final class Segment extends ReentrantLock implements Serializable {
             // accessQueue大小应该与count一致
             Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
-            if (e.getValue().isAllPersist()) {
+            if (e.getQueueEntry().isAllPersist()) {
                 removeEntry(e, e.getHash());
             } else {
                 recordAccess(e);
@@ -475,7 +475,7 @@ final class Segment extends ReentrantLock implements Serializable {
      * @return
      */
     HashEntry copyEntry(HashEntry original, HashEntry newNext) {
-        HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.getValue());
+        HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.getQueueEntry());
         copyAccessEntry(original, newEntry);
         return newEntry;
     }
@@ -574,7 +574,7 @@ final class Segment extends ReentrantLock implements Serializable {
      * @return
      */
     private boolean isExipredAndAllPersist(HashEntry entry, long now) {
-        if (isExpired(entry, now) && entry.getValue().isAllPersist()) {
+        if (isExpired(entry, now) && entry.getQueueEntry().isAllPersist()) {
             return true;
         }
         return false;

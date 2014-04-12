@@ -30,6 +30,17 @@ public class ListFunctionTest {
     public final Logger logger = LoggerFactory.getLogger(getClass());
 
     @Test
+    public void counterTest() {
+        long start = System.nanoTime();
+        int num = 0;
+        while (num < 75000) {
+            num ++;
+        }
+        long end = System.nanoTime();
+        System.out.println("计算消耗时间[ms]：" + (double) (end - start) / 1000000);
+    }
+
+    @Test
     public void funcTest() throws InterruptedException, BrokenBarrierException {
         int num = 5;
         CyclicBarrier barrier = new CyclicBarrier(num + 1);
@@ -65,7 +76,7 @@ public class ListFunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 5000; i++) { // 执行20000次
+                for (int i = 0; i < 15000; i++) { // 执行20000次
                     int random = RandomUtils.nextInt(1000);
                     ListReference<TmpListMultikey> ref = new TmpListMultikeyListCache(50705).ref();
 
@@ -77,7 +88,9 @@ public class ListFunctionTest {
                             // logger.debug("new 新对象,总计 = {}",num);
                         } else {
                             double d = RandomUtils.nextDouble();
-                            if (d >= 0.8) {
+                            // d >= 0 代表纯增加和计算，无删除
+                            // d >= 0.8 代表纯20%修改，80%删除
+                            if (d >= 0) {
                                 tmp.setNValue(tmp.getNValue() + 1);
                                 tmp.update();
                                 long num = counter.incrementAndGet();

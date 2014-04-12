@@ -7,7 +7,7 @@ import com.google.common.base.Preconditions;
  *
  * Created by yanghao on 14-3-27.
  */
-public abstract class AQueueEntry<T> implements IQueueEntry {
+public class FIFOEntry<T> implements IQueueEntry {
 
     /**
      * Q:这里value为啥要是volatile?
@@ -16,13 +16,16 @@ public abstract class AQueueEntry<T> implements IQueueEntry {
      * A:因为HashEntry的操作都是在Segment锁下，
      * 具体解释参考：JDK {@link java.util.concurrent.ConcurrentHashMap.HashEntry}
      */
-    private volatile T value;
+    private volatile T queueEntry;
 
     private IQueueEntry nextAccess = NullEntry.INSTANCE, previousAccess = NullEntry.INSTANCE;
 
-    public AQueueEntry(T value) {
-        Preconditions.checkNotNull(value);
-        this.value = value;
+    public FIFOEntry() {
+    }
+
+    public FIFOEntry(T queueEntry) {
+        Preconditions.checkNotNull(queueEntry);
+        this.queueEntry = queueEntry;
     }
 
     @Override
@@ -45,16 +48,16 @@ public abstract class AQueueEntry<T> implements IQueueEntry {
         this.previousAccess = previous;
     }
 
-    public T getValue() {
-        return value;
+    public T getQueueEntry() {
+        return queueEntry;
     }
 
-    public void setValue(T value) {
-        this.value = value;
+    public void setQueueEntry(T queueEntry) {
+        this.queueEntry = queueEntry;
     }
 
     @Override
     public String toString() {
-        return value.toString();
+        return queueEntry.toString();
     }
 }

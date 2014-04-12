@@ -2,9 +2,11 @@ package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.consist.fifo.FIFOEntry;
 import com.cm4j.test.guava.consist.keys.Identity;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import org.springframework.beans.BeanUtils;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since 2013-1-18 上午09:25:24
  * 
  */
-public abstract class CacheEntry {
+public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 
 	/**
 	 * 缓存状态 - 默认持久化
@@ -29,24 +31,19 @@ public abstract class CacheEntry {
 	private final AtomicInteger numInUpdateQueue = new AtomicInteger(0);
 
 	/**
-	 * 此对象所依附的key
-	 */
-	private AbsReference ref;
-
-	/**
 	 * 更新此对象
 	 */
 	public void update() {
-		Preconditions.checkNotNull(this.ref,"缓存中不存在此对象，请调用Reference中方法添加到缓存中");
-		this.ref.updateEntry(this);
+		Preconditions.checkNotNull(this.ref(),"缓存中不存在此对象，请调用Reference中方法添加到缓存中");
+		this.ref().updateEntry(this);
 	}
 
 	/**
 	 * 删除此对象
 	 */
 	public void delete() {
-		Preconditions.checkNotNull(this.ref);
-		this.ref.deleteEntry(this);
+		Preconditions.checkNotNull(this.ref());
+		this.ref().deleteEntry(this);
 	}
 
 	/**
@@ -70,6 +67,41 @@ public abstract class CacheEntry {
 			ConcurrentCache.getInstance().sendToPersistQueue(this);
 		}
 	}
+
+    /**
+     * 在put时，把属性都拷贝一份出来，DBState也是，作为持久化的一个镜像
+     */
+    private IEntity mirror;
+    private DBState mirrorState;
+
+    /**
+     * 创造镜像
+     */
+    void mirror() {
+        this.mirrorState = dbState;
+
+        IEntity parseEntity = parseEntity();
+        if (this != parseEntity) {
+            // 内存地址不同，创建了新对象
+            this.mirror = parseEntity;
+        } else {
+            // 其他情况，属性拷贝
+            try {
+                this.mirror = parseEntity.getClass().newInstance();
+                BeanUtils.copyProperties(this, this.mirror);
+            } catch (Exception e) {
+                throw new RuntimeException("CacheEntry[" + ref() + "]不能被PropertyCopy", e);
+            }
+        }
+    }
+
+    IEntity mirrorVal() {
+        return mirror;
+    }
+
+    DBState mirrorStateVal() {
+        return mirrorState;
+    }
 
 	/**
 	 * 由子类覆盖
@@ -122,10 +154,10 @@ public abstract class CacheEntry {
 	}
 
 	public AbsReference ref() {
-		return this.ref;
+		return super.getQueueEntry();
 	}
 
 	public void resetRef(AbsReference ref) {
-		this.ref = ref;
+		super.setQueueEntry(ref);
 	}
 }

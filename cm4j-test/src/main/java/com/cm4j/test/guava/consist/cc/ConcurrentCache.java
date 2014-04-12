@@ -203,11 +203,11 @@ public class ConcurrentCache {
         segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getValue() != null && !e.getValue().isAllPersist()) {
+                if (e != null && e.getQueueEntry() != null && !e.getQueueEntry().isAllPersist()) {
                     // deleteSet数据保存
-                    e.getValue().persistDeleteSet();
+                    e.getQueueEntry().persistDeleteSet();
                     // 非deleteSet数据保存
-                    e.getValue().persistDB();
+                    e.getQueueEntry().persistDB();
                     if (isRemove) {
                         segment.removeEntry(e, hash);
                     }
@@ -331,12 +331,12 @@ public class ConcurrentCache {
         boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
             @Override
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getValue() != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, Segment.now())) {
                     // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
                     if (entry.getNumInUpdateQueue().get() != 0) {
                         return false;
                     }
-                    if (e.getValue().changeDbState(entry, DBState.P)) {
+                    if (e.getQueueEntry().changeDbState(entry, DBState.P)) {
                         return true;
                     }
                 }
@@ -368,9 +368,9 @@ public class ConcurrentCache {
         segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getValue() != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, Segment.now())) {
                     // 更改CacheEntry的状态
-                    if (e.getValue().changeDbState(entry, dbState)) {
+                    if (e.getQueueEntry().changeDbState(entry, dbState)) {
                         return null;
                     } else {
                         throw new RuntimeException("缓存[" + key + "]更改状态失败");
@@ -399,7 +399,7 @@ public class ConcurrentCache {
      * @return
      */
     private boolean isExipredAndAllPersist(HashEntry entry, long now) {
-        if (isExpired(entry, now) && entry.getValue().isAllPersist()) {
+        if (isExpired(entry, now) && entry.getQueueEntry().isAllPersist()) {
             return true;
         }
         return false;
