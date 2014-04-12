@@ -1,8 +1,8 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
+import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.ListReference;
-import com.cm4j.test.guava.consist.caches.TmpListMultikeyListCache;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.entity.TmpListMultikeyPK;
 import org.apache.commons.lang.math.RandomUtils;
@@ -19,6 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 多线程异步短时间过期+写入测试
+ * <p/>
+ * 对同一缓存加锁测试数据
+ * 结果:
+ * 完成，数值sum为：75000
+ * 计算消耗时间[s]：6.654958661
+ * 写入消耗时间[s]：2.11685312
  *
  * @author Yang.hao
  * @since 2013-3-6 上午10:12:38
@@ -34,7 +40,7 @@ public class ListFunctionTest {
         long start = System.nanoTime();
         int num = 0;
         while (num < 75000) {
-            num ++;
+            num++;
         }
         long end = System.nanoTime();
         System.out.println("计算消耗时间[ms]：" + (double) (end - start) / 1000000);

@@ -65,22 +65,20 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 5000; i++) { // 执行20000次
+				for (int i = 0; i < 20000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
                         SingleReference<TmpFhhd> ref = new TmpFhhdCache(random).ref();
                         synchronized (ref) {
-
 							TmpFhhd fhhd = ref.get();
 							if (fhhd == null) {
 								long num = counter.incrementAndGet();
 								
 								ref.update(new TmpFhhd(random, 1, 1, ""));
 
-                                // persist需注释
-								ref.persist();
-
+                                // 直接persist需注释
+								// ref.persist();
 							} else {
 								double d = RandomUtils.nextDouble();
 								if (d >= 0) {
@@ -90,15 +88,15 @@ public class FunctionTest {
 									fhhd.update();
 
 									// todo 有新增或删除的persist为嘛会报错？？？
-                                    // 这里是保存，测试需注释
-									ref.persist();
+                                    // 直接persist需注释
+									// ref.persist();
 								} else {
 									counter.addAndGet(-fhhd.getNCurToken());
 
 									fhhd.delete();
 
-                                    // persist需注释
-									ref.persist();
+                                    // 直接persist需注释
+									// ref.persist();
 								}
 							}
 						}
