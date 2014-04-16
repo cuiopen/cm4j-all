@@ -22,7 +22,7 @@ public class AnalysisEntity {
 
         String clsName = cls.getSimpleName();
         clsName = StringUtils.replace(clsName, "Dict", "");
-        clsName += "Cache";
+        clsName += "DictCache";
 
         result.setClsName(clsName);
         result.setEntityName(cls.getSimpleName());

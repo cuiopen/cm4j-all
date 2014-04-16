@@ -1,6 +1,6 @@
 package com.cm4j.test.generator.dict;
 
-import com.cm4j.test.generator.dict.entity.DictCountryRandomEvent;
+import com.cm4j.test.generator.dict.entity.DictCountryDailyTask;
 import freemarker.template.Configuration;
 import freemarker.template.DefaultObjectWrapper;
 import freemarker.template.Template;
@@ -19,8 +19,8 @@ public class Dict_Generator {
     private static String TARGET_DIR = "E:\\workspace\\bojoy\\king\\Kinghigh_CODE_Server\\Kinghigh_cn_cn_Server\\branches\\20131024\\src\\java\\net\\bojoy\\king\\game\\dict\\";
 
     // 待生成的entity
-    private static final Class entity = DictCountryRandomEvent.class;
-    private static final String commnet = "国战随机事件缓存";
+    private static final Class entity = DictCountryDailyTask.class;
+    private static final String commnet = "国战每日任务缓存";
 
     public static void main(String[] args) throws Exception {
         File dir = new File(TARGET_DIR);

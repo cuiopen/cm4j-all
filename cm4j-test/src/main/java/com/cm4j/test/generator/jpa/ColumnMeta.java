@@ -139,7 +139,9 @@ public class ColumnMeta {
             }
         } else if (StringUtils.startsWith(type, "bigint")) {        // long
             propertyType = isNullable.equals("NO") ? "long" : "Long";
-        } else if (StringUtils.startsWith(type, "tinyint")) {        // long
+        } else if (StringUtils.startsWith(type, "smallint")) {        // long
+            propertyType = isNullable.equals("NO") ? "short" : "Short";
+        }  else if (StringUtils.startsWith(type, "tinyint")) {        // long
             propertyType = isNullable.equals("NO") ? "byte" : "Byte";
         } else if (StringUtils.startsWith(type, "double")) {        // double
             propertyType = isNullable.equals("NO") ? "double" : "Double";
