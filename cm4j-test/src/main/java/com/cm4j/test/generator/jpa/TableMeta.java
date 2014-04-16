@@ -13,7 +13,7 @@ import java.util.List;
 public class TableMeta {
 
     // 包路径
-    private String packageDir = Consts.PACK_DIR;
+    private String packageDir = POJO_Generator.Consts.PACK_DIR;
     // ftl中暂时未用
     private String schemaName;
     private String tableName;
@@ -50,10 +50,10 @@ public class TableMeta {
         StringBuffer className = new StringBuffer();
 
         boolean need = false;
-        if (StringUtils.isNotBlank(Consts.DB_TABLE) && Consts.DB_TABLE.equals(tableName)) {
+        if (StringUtils.isNotBlank(POJO_Generator.Consts.DB_TABLE) && POJO_Generator.Consts.DB_TABLE.equals(tableName)) {
             need = true;
         }
-        if (StringUtils.isBlank(Consts.DB_TABLE) && StringUtils.startsWith(tableName, Consts.DB_TABLE_PREFIX)) {
+        if (StringUtils.isBlank(POJO_Generator.Consts.DB_TABLE) && StringUtils.startsWith(tableName, POJO_Generator.Consts.DB_TABLE_PREFIX)) {
             need = true;
         }
 

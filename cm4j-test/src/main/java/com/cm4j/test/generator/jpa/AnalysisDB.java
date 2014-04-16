@@ -24,7 +24,7 @@ public class AnalysisDB {
     public static final List<TableMeta> readDB() {
         List<TableMeta> list = new ArrayList<TableMeta>();
         String sql = "SELECT TABLE_NAME ,TABLE_COMMENT FROM information_schema.tables "
-                + " WHERE table_schema ='" + Consts.DB_NAME + "'";
+                + " WHERE table_schema ='" + POJO_Generator.Consts.DB_NAME + "'";
         PreparedStatement ps = null;
         ResultSet rs = null;
         try {
@@ -32,7 +32,7 @@ public class AnalysisDB {
             rs = ps.executeQuery();
             while (rs.next()) {
                 TableMeta tm = new TableMeta();
-                tm.setSchemaName(Consts.DB_NAME);
+                tm.setSchemaName(POJO_Generator.Consts.DB_NAME);
                 tm.setTableName(rs.getString("TABLE_NAME"));
                 tm.setComment(rs.getString("TABLE_COMMENT"));
                 list.add(tm);
@@ -72,7 +72,7 @@ public class AnalysisDB {
     private static final void readTable(TableMeta table) {
         List<ColumnMeta> list = new ArrayList<ColumnMeta>();
         String sql = "SELECT COLUMN_NAME ,ORDINAL_POSITION ,IS_NULLABLE ,COLUMN_DEFAULT ,COLUMN_TYPE ,COLUMN_KEY ,EXTRA ,COLUMN_COMMENT "
-                + " FROM information_schema.columns WHERE table_schema ='" + Consts.DB_NAME + "' AND table_name = '" + table.getTableName() + "'";
+                + " FROM information_schema.columns WHERE table_schema ='" + POJO_Generator.Consts.DB_NAME + "' AND table_name = '" + table.getTableName() + "'";
         PreparedStatement ps = null;
         ResultSet rs = null;
         try {

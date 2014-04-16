@@ -21,7 +21,7 @@ public class DBHandler {
             e.printStackTrace();
         }
         try {
-            conn = DriverManager.getConnection("jdbc:mysql://" + Consts.DB_HOST + ":" + Consts.DB_PORT + "/" + Consts.DB_NAME, Consts.DB_USER, Consts.DB_PASS);
+            conn = DriverManager.getConnection("jdbc:mysql://" + POJO_Generator.Consts.DB_HOST + ":" + POJO_Generator.Consts.DB_PORT + "/" + POJO_Generator.Consts.DB_NAME, POJO_Generator.Consts.DB_USER, POJO_Generator.Consts.DB_PASS);
         } catch (SQLException e) {
             e.printStackTrace();
         }
