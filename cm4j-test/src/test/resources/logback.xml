@@ -55,7 +55,7 @@
 			<fileNamePattern>../logs/log-perf.%d{yyyy-MM-dd}.log</fileNamePattern>
 		</rollingPolicy>
 		<layout class="ch.qos.logback.classic.PatternLayout">
-			<pattern>%m%n</pattern>
+			<pattern>%-5level %logger{36} [%file:%line] %m%n</pattern>
 		</layout>
 	</appender>
 	<!--获取所有的StopWatch 信息并处理 -->
@@ -72,7 +72,5 @@
 		<appender-ref ref="perf4j" />
 	</logger>
 	
-	<root>
-		<level value="error" />
-	</root>
+
 </configuration>

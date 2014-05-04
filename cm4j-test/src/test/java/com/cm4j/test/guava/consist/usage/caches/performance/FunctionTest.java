@@ -1,8 +1,8 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
+import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.SingleReference;
-import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 20000; i++) { // 执行20000次
+				for (int i = 0; i < 16000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 

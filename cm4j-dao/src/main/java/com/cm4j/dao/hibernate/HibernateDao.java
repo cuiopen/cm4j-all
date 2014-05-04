@@ -160,10 +160,10 @@ public class HibernateDao<E, ID extends Serializable> implements InitializingBea
 	 * 构造函数，通过spring配置注入持久化对象
 	 */
 	public HibernateDao(Class<E> persistentClass) {
-		if (persistentClass == null) {
+		if (this.persistentClass == null) {
 			this.persistentClass = persistentClass;
-		}
-		logger.debug("HibernateDao构造函数获取POJO：{}", persistentClass);
+            logger.debug("HibernateDao构造函数获取POJO：{}", persistentClass);
+        }
 	}
 
 	// **************************************************************************
