@@ -13,8 +13,8 @@ import java.util.Map;
 /**
  * ${comment!""}
  *
- * @desc     代码生成器生成.
- * @date     ${.now?string("yyyy-MM-dd")}
+ * @desc 代码生成器生成.
+ * @date ${.now?string("yyyy-MM-dd")}
  */
 public class ${clsName} implements IExtReload {
 
