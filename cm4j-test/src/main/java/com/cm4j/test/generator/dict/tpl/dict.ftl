@@ -19,18 +19,19 @@ import java.util.Map;
 public class ${clsName} implements IExtReload {
 
     private static final Log log = LogFactory.getLog(DanYaoDictCache.class);
-    private static final Map<${idType}, ${entityName}> data = Maps.newHashMap();
+    private static Map<${idType}, ${entityName}> data = Maps.newHashMap();
 
     private IQueryDictDAO queryDictDAO;
 
     @Override
     public void reload() {
         try {
-            data.clear();
+            Map<${idType}, ${entityName}> tmp = Maps.newHashMap();
             List<${entityName}> all = queryDictDAO.findAll(${entityName}.class);
             for (${entityName} entity : all) {
-                data.put(entity.${idGetterName}(), entity);
+                tmp.put(entity.${idGetterName}(), entity);
             }
+            data = tmp;
         } catch (Exception e) {
             log.error("", e);
         }

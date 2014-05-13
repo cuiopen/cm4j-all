@@ -3,6 +3,7 @@ package com.cm4j.test.generator.dict;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang.StringUtils;
 
+import javax.persistence.EmbeddedId;
 import javax.persistence.Id;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -30,7 +31,7 @@ public class AnalysisEntity {
         // 查找主键
         Field[] declaredFields = cls.getDeclaredFields();
         for (Field field : declaredFields) {
-            if (field.isAnnotationPresent(Id.class)) {
+            if (field.isAnnotationPresent(Id.class) || field.isAnnotationPresent(EmbeddedId.class)) {
                 result.setIdType(transferPrimitive(field.getType()));
                 result.setIdGetterName("get" + upperCaseFirst(field.getName()));
                 break;
@@ -40,7 +41,7 @@ public class AnalysisEntity {
         if (StringUtils.isBlank(result.getIdType())) {
             Method[] declaredMethods = cls.getDeclaredMethods();
             for (Method method : declaredMethods) {
-                if (method.isAnnotationPresent(Id.class)) {
+                if (method.isAnnotationPresent(Id.class) || method.isAnnotationPresent(EmbeddedId.class)) {
                     result.setIdType(transferPrimitive(method.getReturnType()));
                     result.setIdGetterName(method.getName());
                     break;
