@@ -17,7 +17,7 @@ import java.util.Map;
  * <p/>
  * Created by yanghao on 14-3-1.
  */
-public abstract class AbsCCDataWarpper {
+public abstract class AbsCCDataWrapper {
 
     private final Class pojo;
     private Class pojoId;
@@ -28,7 +28,7 @@ public abstract class AbsCCDataWarpper {
 
     private Map dataModel;
 
-    protected AbsCCDataWarpper(Class pojo, Map params, String query) {
+    protected AbsCCDataWrapper(Class pojo, Map params, String query) {
         this.pojo = pojo;
         this.params = params;
         this.query = query;

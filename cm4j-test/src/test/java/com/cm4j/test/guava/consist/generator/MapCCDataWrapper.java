@@ -5,7 +5,7 @@ import java.util.Map;
 /**
  * Created by yanghao on 14-3-2.
  */
-public class MapCCDataWrapper extends AbsCCDataWarpper {
+public class MapCCDataWrapper extends AbsCCDataWrapper {
 
     protected MapCCDataWrapper(Class pojo, Map params, String query) {
         super(pojo, params, query);

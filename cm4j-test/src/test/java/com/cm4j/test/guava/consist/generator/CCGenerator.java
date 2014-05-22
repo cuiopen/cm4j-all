@@ -33,14 +33,14 @@ public class CCGenerator {
         return cfg;
     }
 
-    public static void generateMap(AbsCCDataWarpper wrpper) throws Exception {
-        Template template = configure().getTemplate(wrpper.getFtlName());
+    public static void generateMap(AbsCCDataWrapper wrapper) throws Exception {
+        Template template = configure().getTemplate(wrapper.getFtlName());
 
         // 输出途径
         Writer out = new OutputStreamWriter(System.out);
 //        Writer out = new FileWriter(generatePath + packagePath + "/" + fileName + "2.java");
 
-        template.process(wrpper.dataModel(), out);
+        template.process(wrapper.dataModel(), out);
         out.flush();
     }
 
