@@ -560,23 +560,6 @@ final class Segment extends ReentrantLock implements Serializable {
     }
 
     private boolean isExpired(HashEntry entry, long now) {
-        if (now - entry.getAccessTime() > Constants.expireAfterAccessNanos) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 过期且所有对象已存储
-     *
-     * @param entry
-     * @param now
-     * @return
-     */
-    private boolean isExipredAndAllPersist(HashEntry entry, long now) {
-        if (isExpired(entry, now) && entry.getQueueEntry().isAllPersist()) {
-            return true;
-        }
-        return false;
+        return (now - entry.getAccessTime() > Constants.expireAfterAccessNanos);
     }
 }
