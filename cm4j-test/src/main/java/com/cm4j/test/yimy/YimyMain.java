@@ -7,7 +7,7 @@ public class YimyMain {
 
 
     public static void main(String[] args) {
-        Product product = Product.YICANMI;
+        Product product = Product.YICANMI_10B;
         Express express = Express.SHUNFEN;
 
         ComputedResult result = new ComputedResult(product, express);

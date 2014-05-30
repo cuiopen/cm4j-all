@@ -8,7 +8,9 @@ import com.google.common.collect.ImmutableMap;
  */
 public enum Product {
 
-    YICANMI("一餐米[尝鲜装]", 300, 9.8, 3),;
+    YICANMI("一餐米[尝鲜装]", 300, 9.8, 3),
+    YICANMI_10B("一餐米10袋装[特惠装]", 300, 9.8, 10),
+    ;
 
     private String name;
     /**
