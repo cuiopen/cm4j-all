@@ -15,9 +15,13 @@ import com.google.common.base.Preconditions;
  */
 public abstract class CacheDefiniens<V extends AbsReference> {
 
-	private Object[] params;
+    private final String key;
 
+    /**
+     * 仅反射时使用
+     */
 	protected CacheDefiniens() {
+        this.key = null;
 	}
 	
 	/**
@@ -28,7 +32,10 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 		for (Object param : params) {
 			KEYS.checkParam(param);
 		}
-		this.params = params;
+
+        PrefixMappping mapping = PrefixMappping.getMapping(this);
+        Preconditions.checkNotNull(mapping, "此缓存未在PrefixMappping进行映射：" + this.getClass().getSimpleName());
+        this.key = new JOINER(mapping.name(), params).key();
 	}
 
 	/**
@@ -41,9 +48,7 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 	public abstract V load(String... params);
 
 	public String getKey() {
-		PrefixMappping mapping = PrefixMappping.getMapping(this);
-		Preconditions.checkNotNull(mapping, "此缓存未在PrefixMappping进行映射：" + this.getClass().getSimpleName());
-		return new JOINER(mapping.name(), params).key();
+		return this.key;
 	}
 
 	/**

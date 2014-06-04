@@ -114,8 +114,8 @@ final class Segment extends ReentrantLock implements Serializable {
                 if (e != null) {
                     // 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
                     AbsReference value = getLiveValue(key, hash, now());
-                    watch.lap("cache.getLiveValue()");
                     if (value != null) {
+                        watch.lap("get.缓存获取到");
                         recordAccess(e);
                         return value;
                     }
@@ -124,12 +124,12 @@ final class Segment extends ReentrantLock implements Serializable {
             if (isLoad) {
                 // at this point e is either null or expired;
                 AbsReference ref = lockedGetOrLoad(key, hash, loader);
-                watch.lap("cache.lockedGetOrLoad()");
+                watch.lap("get.锁定获取");
                 return ref;
             }
         } finally {
             postReadCleanup();
-            watch.stop("cache.get()");
+            watch.stop("get()完成");
         }
         return null;
     }
@@ -167,9 +167,7 @@ final class Segment extends ReentrantLock implements Serializable {
             }
 
             // 获取且保存
-            StopWatch watch = new Slf4JStopWatch();
             value = loader.load(key);
-            watch.stop("cache.loadFromDB()");
 
             if (value != null) {
                 put(key, hash, value, false);
@@ -267,7 +265,7 @@ final class Segment extends ReentrantLock implements Serializable {
         } finally {
             unlock();
             postWriteCleanup();
-            watch.stop("cache.put()");
+            watch.stop("put()完成");
         }
     }
 
@@ -327,7 +325,7 @@ final class Segment extends ReentrantLock implements Serializable {
         }
         table = newTable;
         this.count = newCount;
-        watch.stop("cache.rehash()");
+        watch.stop("rehash()完成");
     }
 
     /**

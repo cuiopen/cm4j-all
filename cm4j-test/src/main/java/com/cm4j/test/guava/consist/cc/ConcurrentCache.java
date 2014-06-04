@@ -8,8 +8,6 @@ import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import org.perf4j.StopWatch;
-import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -323,7 +321,6 @@ public class ConcurrentCache {
      * @return 是否成功修改
      */
     boolean changeDbStatePersist(final CacheEntry entry) {
-        StopWatch watch = new Slf4JStopWatch();
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
 
         final String key = entry.ref().getAttachedKey();
@@ -344,7 +341,6 @@ public class ConcurrentCache {
                 throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
             }
         });
-        watch.stop("cache.changeDbStatePersist()");
         return result;
     }
 
@@ -356,7 +352,6 @@ public class ConcurrentCache {
      * @param dbState U or D,不允许P
      */
     void changeDbState(final CacheEntry entry, final DBState dbState) {
-        StopWatch watch = new Slf4JStopWatch();
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
@@ -379,7 +374,6 @@ public class ConcurrentCache {
                 throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
             }
         });
-        watch.stop("cache.changeDbState()");
     }
 
 	/* ---------------- expiration ---------------- */

@@ -10,7 +10,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.NonUniqueObjectException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
-import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,10 +43,8 @@ public class DBPersistQueue {
      * @param entry
      */
     public void sendToPersistQueue(CacheEntry entry) {
-        StopWatch watch = new Slf4JStopWatch();
         entry.getNumInUpdateQueue().incrementAndGet();
         queue.add(new CacheEntryInPersistQueue(entry));
-        watch.stop("cache.sendToPersistQueue()");
     }
 
     /**
@@ -72,11 +69,11 @@ public class DBPersistQueue {
             }
             logger.debug("缓存存储数据开始");
 
-            final StopWatch watch = new Slf4JStopWatch();
             List<CacheEntryInPersistQueue> toBatch = new ArrayList<CacheEntryInPersistQueue>();
 
             CacheEntryInPersistQueue wrapper;
             while ((wrapper = queue.poll()) != null) {
+                final Slf4JStopWatch stopWatch = new Slf4JStopWatch();
                 CacheEntry reference = wrapper.getReference();
                 int num = reference.getNumInUpdateQueue().decrementAndGet();
                 // 删除或者更新的num为0
@@ -85,9 +82,8 @@ public class DBPersistQueue {
                     if (entity != null && DBState.P != wrapper.getDbState()) {
                         toBatch.add(wrapper);
                     }
+                    stopWatch.lap("持久queue找到需处理entry");
                 }
-
-                watch.lap("cache.loopPersisitQueue()");
 
                 // 条件：在toBatch大于0的情况下 (或关系)：
                 // 1.toBatch的大小达到 Constants.BATCH_TO_COMMIT
@@ -101,8 +97,10 @@ public class DBPersistQueue {
                         logger.error("缓存批处理异常", e);
                     }
                     toBatch.clear();
-                    watch.stop("cache.batchPersistData()");
+                    stopWatch.lap("持久queue批处理");
                 }
+
+                stopWatch.stop("持久queue循环结束");
             }
         }
         logger.error("定时[{}]检测结束，本次存储大小为{}", currentCounter, persistNum);

@@ -2,8 +2,6 @@ package com.cm4j.test.guava.consist.cc.persist;
 
 import com.cm4j.test.guava.consist.cc.CacheEntry;
 import com.cm4j.test.guava.consist.entity.IEntity;
-import org.perf4j.StopWatch;
-import org.perf4j.slf4j.Slf4JStopWatch;
 import org.springframework.beans.BeanUtils;
 
 /**
@@ -21,22 +19,18 @@ public class CacheEntryInPersistQueue {
         this.dbState = reference.getDbState();
 
         IEntity parseEntity = reference.parseEntity();
-        StopWatch watch = new Slf4JStopWatch();
         if (reference instanceof IEntity && (reference != parseEntity)) {
             // 内存地址不同，创建了新对象
             this.entity = parseEntity;
-            watch.lap("cache.entry.new_object()");
         } else {
             // 其他情况，属性拷贝
             try {
                 this.entity = parseEntity.getClass().newInstance();
                 BeanUtils.copyProperties(reference, this.entity);
-                watch.lap("cache.entry.property_copy()");
             } catch (Exception e) {
                 throw new RuntimeException("CacheEntry[" + reference.ref() + "]不能被PropertyCopy", e);
             }
         }
-        watch.stop("cache.entry.init_finish()");
     }
 
     /**
