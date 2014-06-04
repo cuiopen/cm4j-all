@@ -81,7 +81,7 @@ public class FunctionTest {
 								// ref.persist();
 							} else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0) {
+								if (d >= 0) { // >=0 一定成立，则无删除
 									long num = counter.incrementAndGet();
 									
 									fhhd.increaseValue();
