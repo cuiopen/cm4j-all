@@ -2,7 +2,6 @@ package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.constants.Constants;
-import com.cm4j.test.guava.consist.cc.persist.CacheEntryInPersistQueue;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
@@ -26,7 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class DBPersistQueue {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConcurrentLinkedQueue<CacheEntryInPersistQueue> queue;
+    private final ConcurrentLinkedQueue<CacheEntry> queue;
 
     /**
      * 更新队列消费计数器
@@ -34,7 +33,7 @@ public class DBPersistQueue {
     public long counter = 0L;
 
     public DBPersistQueue() {
-        this.queue = new ConcurrentLinkedQueue<CacheEntryInPersistQueue>();
+        this.queue = new ConcurrentLinkedQueue<CacheEntry>();
     }
 
     /**
@@ -43,8 +42,18 @@ public class DBPersistQueue {
      * @param entry
      */
     public void sendToPersistQueue(CacheEntry entry) {
-        entry.getNumInUpdateQueue().incrementAndGet();
-        queue.add(new CacheEntryInPersistQueue(entry));
+        // TODO 这里是个瓶颈，从queue移除是一个个遍历移除的，如果数据量很大，则会拖慢速度
+        // 之前采用只加入不移除，则出现遍历队列太慢的问题
+        // 现在改成移除再加入，则出现remove慢的问题
+
+        // 最好是提供一个自动加入到队列尾部的高并发队列 [待扩展]
+
+        // 先从队列删除
+        queue.remove(entry);
+        // 重置persist信息
+        entry.mirror();
+        // 加入到队列尾部
+        queue.add(entry);
     }
 
     /**
@@ -69,21 +78,19 @@ public class DBPersistQueue {
             }
             logger.debug("缓存存储数据开始");
 
-            List<CacheEntryInPersistQueue> toBatch = new ArrayList<CacheEntryInPersistQueue>();
+            List<CacheEntry> toBatch = new ArrayList<CacheEntry>();
 
-            CacheEntryInPersistQueue wrapper;
+            CacheEntry wrapper;
             while ((wrapper = queue.poll()) != null) {
                 final Slf4JStopWatch stopWatch = new Slf4JStopWatch();
-                CacheEntry reference = wrapper.getReference();
-                int num = reference.getNumInUpdateQueue().decrementAndGet();
+                wrapper.getIsChanged().set(true);
+
                 // 删除或者更新的num为0
-                if (num == 0) {
-                    IEntity entity = wrapper.getEntity();
-                    if (entity != null && DBState.P != wrapper.getDbState()) {
-                        toBatch.add(wrapper);
-                    }
-                    stopWatch.lap("持久queue找到需处理entry");
+                IEntity entity = wrapper.mirrorEntity();
+                if (entity != null && DBState.P != wrapper.mirrorDBState()) {
+                    toBatch.add(wrapper);
                 }
+                stopWatch.lap("持久queue找到需处理entry");
 
                 // 条件：在toBatch大于0的情况下 (或关系)：
                 // 1.toBatch的大小达到 Constants.BATCH_TO_COMMIT
@@ -110,16 +117,16 @@ public class DBPersistQueue {
      * 批处理写入数据
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void batchPersistData(Collection<CacheEntryInPersistQueue> entities) {
+    private void batchPersistData(Collection<CacheEntry> entities) {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         Session session = hibernate.getSession();
         Transaction tx = session.beginTransaction();
         try {
             int idx = 0;
 
-            for (CacheEntryInPersistQueue wrapper : entities) {
-                DBState dbState = wrapper.getDbState();
-                IEntity entity = wrapper.getEntity();
+            for (CacheEntry wrapper : entities) {
+                DBState dbState = wrapper.mirrorDBState();
+                IEntity entity = wrapper.mirrorEntity();
 
                 if (DBState.U == dbState) {
                     session.merge(entity);
@@ -136,9 +143,9 @@ public class DBPersistQueue {
             }
             // 提交
             tx.commit();
-            for (CacheEntryInPersistQueue wrapper : entities) {
+            for (CacheEntry wrapper : entities) {
                 // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                ConcurrentCache.getInstance().changeDbStatePersist(wrapper.getReference());
+                ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
             }
         } catch (HibernateException exception) {
             tx.rollback();
@@ -147,10 +154,10 @@ public class DBPersistQueue {
                 // 可以参考：http://stackoverflow.com/questions/6518567/org-hibernate-nonuniqueobjectexception
                 logger.error("缓存批处理写入DB异常", exception);
             }
-            for (CacheEntryInPersistQueue wrapper : entities) {
+            for (CacheEntry wrapper : entities) {
                 try {
-                    DBState dbState = wrapper.getDbState();
-                    IEntity entity = wrapper.getEntity();
+                    DBState dbState = wrapper.mirrorDBState();
+                    IEntity entity = wrapper.mirrorEntity();
 
                     if (DBState.U == dbState) {
                         hibernate.saveOrUpdate(entity);
@@ -158,7 +165,7 @@ public class DBPersistQueue {
                         hibernate.delete(entity);
                     }
                     // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                    ConcurrentCache.getInstance().changeDbStatePersist(wrapper.getReference());
+                    ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
                 } catch (DataAccessException e1) {
                     logger.error("批处理失败，单条更新失败", e1);
                 }

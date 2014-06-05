@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 20000; i++) { // 执行20000次
+				for (int i = 0; i < 40000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 

@@ -314,7 +314,7 @@ public class ConcurrentCache {
 	/* ---------------- 内部方法 -------------- */
 
     /**
-     * 在没有修改的时候，即entry.getNumInUpdateQueue().get() == 0时调用<br>
+     * 在没有修改的时候，即entry.getIsChanged().get() == 0时调用<br>
      * 它会在有锁的情况下检测修改数量是否为0，如果为0则修改为P，否则代表有其他线程修改了，不更改为P
      *
      * @param entry
@@ -330,7 +330,7 @@ public class ConcurrentCache {
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
                 if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, Segment.now())) {
                     // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
-                    if (entry.getNumInUpdateQueue().get() != 0) {
+                    if (entry.getIsChanged().get()) {
                         return false;
                     }
                     if (e.getQueueEntry().changeDbState(entry, DBState.P)) {

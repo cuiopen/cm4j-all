@@ -9,7 +9,7 @@ import com.google.common.base.Throwables;
 import org.springframework.beans.BeanUtils;
 
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 单个缓存值，例如数据库中的一行数据<br>
@@ -26,11 +26,47 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 */
 	private volatile DBState dbState = DBState.P;
 	/**
-	 * 在更新队列中的数量
+	 * 放到persist队列则设置为true，每次迭代到则设为false
+     * 修改完成时，检测是否是false，如果不是，则代表有其他线程修改了，这时不能设置DBState为P
 	 */
-	private final AtomicInteger numInUpdateQueue = new AtomicInteger(0);
+	private final AtomicBoolean isChanged = new AtomicBoolean(false);
 
-	/**
+    private IEntity mirrorEntity;
+    private DBState mirrorDBState;
+
+    public IEntity mirrorEntity() {
+        return mirrorEntity;
+    }
+
+    public DBState mirrorDBState() {
+        return mirrorDBState;
+    }
+
+    /**
+     * 放入队列时
+     * 需要把当前状态和数据做一个镜像备份，保存db时就用备份数据，这样不会出现当前数据更改了，影响到保存DB的数据
+     */
+    public void mirror() {
+        getIsChanged().set(true);
+
+        IEntity parseEntity = this.parseEntity();
+        if (this instanceof IEntity && (this != parseEntity)) {
+            // 内存地址不同，创建了新对象
+            this.mirrorEntity = parseEntity;
+        } else {
+            // 其他情况，属性拷贝
+            try {
+                IEntity entity = parseEntity.getClass().newInstance();
+                BeanUtils.copyProperties(this, entity);
+                this.mirrorEntity = entity;
+            } catch (Exception e) {
+                throw new RuntimeException("CacheEntry[" + this.ref() + "]不能被PropertyCopy", e);
+            }
+        }
+        this.mirrorDBState = this.dbState;
+    }
+
+    /**
 	 * 更新此对象
 	 */
 	public void update() {
@@ -67,41 +103,6 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 			ConcurrentCache.getInstance().sendToPersistQueue(this);
 		}
 	}
-
-    /**
-     * 在put时，把属性都拷贝一份出来，DBState也是，作为持久化的一个镜像
-     */
-    private IEntity mirror;
-    private DBState mirrorState;
-
-    /**
-     * 创造镜像
-     */
-    void mirror() {
-        this.mirrorState = dbState;
-
-        IEntity parseEntity = parseEntity();
-        if (this != parseEntity) {
-            // 内存地址不同，创建了新对象
-            this.mirror = parseEntity;
-        } else {
-            // 其他情况，属性拷贝
-            try {
-                this.mirror = parseEntity.getClass().newInstance();
-                BeanUtils.copyProperties(this, this.mirror);
-            } catch (Exception e) {
-                throw new RuntimeException("CacheEntry[" + ref() + "]不能被PropertyCopy", e);
-            }
-        }
-    }
-
-    IEntity mirrorVal() {
-        return mirror;
-    }
-
-    DBState mirrorStateVal() {
-        return mirrorState;
-    }
 
 	/**
 	 * 由子类覆盖
@@ -149,8 +150,8 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 		this.dbState = dbState;
 	}
 
-	AtomicInteger getNumInUpdateQueue() {
-		return numInUpdateQueue;
+	AtomicBoolean getIsChanged() {
+		return isChanged;
 	}
 
 	public AbsReference ref() {
