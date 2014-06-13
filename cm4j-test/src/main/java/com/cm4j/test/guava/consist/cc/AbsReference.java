@@ -58,6 +58,7 @@ abstract class AbsReference {
      * @return
      */
     protected boolean isAllPersist() {
+        // TODO 这个是否要改成标识，而不是每次去循环判断？
         if (getDeletedSet().size() > 0) {
             return false;
         }

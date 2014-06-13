@@ -1,8 +1,8 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.constants.Constants;
-import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
+import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.google.common.base.Preconditions;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
@@ -17,12 +17,12 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
-* Created by yanghao on 14-3-31.
-*/
+ * Created by yanghao on 14-3-31.
+ */
 final class Segment extends ReentrantLock implements Serializable {
-    
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    
+
     private static final long serialVersionUID = 2249069246763182397L;
     // 作为位操作的mask，必须是(2^n)-1
     private static final int DRAIN_THRESHOLD = 0x3F;
@@ -33,20 +33,11 @@ final class Segment extends ReentrantLock implements Serializable {
     transient volatile AtomicReferenceArray<HashEntry> table;
     final float loadFactor;
 
-    // 缓存读取，写入的对象都需要放入recencyQueue
-    // 为什么要有recencyQueue？
-    // 因为accessQueue是非线程安全的，如果直接在recordAccess()里面调用accessQueue，则线程不安全
-    // 因此增加一个线程安全的recencyQueue来保证线程的安全性，
-    final Queue<HashEntry> recencyQueue = new ConcurrentLinkedQueue<HashEntry>();
     // 真正中缓存的访问顺序
     // accessQueue的大小应该与缓存的size一样大
     final FIFOAccessQueue<HashEntry> accessQueue = new FIFOAccessQueue();
-    final AtomicInteger readCount = new AtomicInteger();
 
-    Segment(int initialCapacity, float lf) {
-        loadFactor = lf;
-        setTable(HashEntry.newArray(initialCapacity));
-    }
+    // inner
 
     static final Segment[] newArray(int i) {
         return new Segment[i];
@@ -54,6 +45,11 @@ final class Segment extends ReentrantLock implements Serializable {
 
     public static long now() {
         return System.nanoTime();
+    }
+
+    Segment(int initialCapacity, float lf) {
+        loadFactor = lf;
+        setTable(HashEntry.newArray(initialCapacity));
     }
 
     void setTable(AtomicReferenceArray<HashEntry> newTable) {
@@ -105,6 +101,8 @@ final class Segment extends ReentrantLock implements Serializable {
         }
         return e;
     }
+
+    // called methods
 
     AbsReference get(String key, int hash, CacheLoader<String, AbsReference> loader, boolean isLoad) {
         final StopWatch watch = new Slf4JStopWatch();
@@ -269,6 +267,47 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    /**
+     * Remove; match on key only if value null, else match both.
+     */
+    AbsReference remove(String key, int hash, AbsReference value) {
+        lock();
+        try {
+            preWriteCleanup(now());
+
+            HashEntry e = getEntry(key, hash);
+            AbsReference oldValue = null;
+            if (e != null) {
+                AbsReference v = e.getQueueEntry();
+                if (value == null || value.equals(v)) {
+                    oldValue = v;
+                    removeEntry(e, e.getHash());
+                }
+            }
+            return oldValue;
+        } finally {
+            unlock();
+            postWriteCleanup();
+        }
+    }
+
+    void clear() {
+        if (count != 0) {
+            lock();
+            try {
+                AtomicReferenceArray<HashEntry> tab = table;
+                for (int i = 0; i < tab.length(); i++)
+                    tab.set(i, null);
+
+                accessQueue.clear();
+                ++modCount;
+                count = 0; // write-volatile
+            } finally {
+                unlock();
+            }
+        }
+    }
+
     void rehash() {
         StopWatch watch = new Slf4JStopWatch();
         AtomicReferenceArray<HashEntry> oldTable = table;
@@ -326,47 +365,6 @@ final class Segment extends ReentrantLock implements Serializable {
         table = newTable;
         this.count = newCount;
         watch.stop("rehash()完成");
-    }
-
-    /**
-     * Remove; match on key only if value null, else match both.
-     */
-    AbsReference remove(String key, int hash, AbsReference value) {
-        lock();
-        try {
-            preWriteCleanup(now());
-
-            HashEntry e = getEntry(key, hash);
-            AbsReference oldValue = null;
-            if (e != null) {
-                AbsReference v = e.getQueueEntry();
-                if (value == null || value.equals(v)) {
-                    oldValue = v;
-                    removeEntry(e, e.getHash());
-                }
-            }
-            return oldValue;
-        } finally {
-            unlock();
-            postWriteCleanup();
-        }
-    }
-
-    void clear() {
-        if (count != 0) {
-            lock();
-            try {
-                AtomicReferenceArray<HashEntry> tab = table;
-                for (int i = 0; i < tab.length(); i++)
-                    tab.set(i, null);
-
-                accessQueue.clear();
-                ++modCount;
-                count = 0; // write-volatile
-            } finally {
-                unlock();
-            }
-        }
     }
 
     <R> R doInSegmentUnderLock(String key, int hash, ConcurrentCache.SegmentLockHandler<R> handler) {
@@ -487,6 +485,8 @@ final class Segment extends ReentrantLock implements Serializable {
         accessQueue.nullifyAccessOrder(original);
     }
 
+    final AtomicInteger readCount = new AtomicInteger();
+
     /**
      * Performs routine cleanup following a read. Normally cleanup happens
      * during writes. If cleanup is not observed after a sufficient number
@@ -502,8 +502,8 @@ final class Segment extends ReentrantLock implements Serializable {
      * Performs routine cleanup prior to executing a write. This should be
      * called every time a write thread acquires the segment lock,
      * immediately after acquiring the lock.
-     * <p/>
-     * <p/>
+     * <p>
+     * <p>
      * Post-condition: expireEntries has been run.
      */
     void preWriteCleanup(long now) {
@@ -532,6 +532,12 @@ final class Segment extends ReentrantLock implements Serializable {
             // map.processPendingNotifications();
         }
     }
+
+    // 缓存读取，写入的对象都需要放入recencyQueue
+    // 为什么要有recencyQueue？
+    // 因为accessQueue是非线程安全的，如果直接在recordAccess()里面调用accessQueue，则线程不安全
+    // 因此增加一个线程安全的recencyQueue来保证线程的安全性，
+    final Queue<HashEntry> recencyQueue = new ConcurrentLinkedQueue<HashEntry>();
 
     /**
      * 1.记录访问时间<br>
