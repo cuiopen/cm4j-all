@@ -15,7 +15,7 @@ import java.util.Set;
  * @author Yang.hao
  * @since 2013-3-2 上午10:42:59
  */
-public abstract class AbsReference {
+abstract class AbsReference {
 
     // 用于存放暂时未被删除对象
     // 里面对象只能被删除，不可更改状态
