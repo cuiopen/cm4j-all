@@ -8,9 +8,11 @@ import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -198,6 +200,12 @@ public class ConcurrentCache {
                     e.getQueueEntry().persistDB();
                     if (isRemove) {
                         // todo 这里没有从持久化队列里面移除？？？
+                        HashSet<CacheEntry> result = Sets.newHashSet();
+                        result.addAll(e.getQueueEntry().getDeletedSet());
+                        result.addAll(e.getQueueEntry().getNotDeletedSet());
+                        for (CacheEntry cacheEntry : result) {
+                            segment.getPersistQueue().removeFromPersistQueue(cacheEntry);
+                        }
                         segment.removeEntry(e, hash);
                     }
                 }

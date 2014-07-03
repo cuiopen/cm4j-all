@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 200000; i++) { // 执行20000次
+				for (int i = 0; i < 50; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -78,7 +78,7 @@ public class FunctionTest {
 								ref.update(new TmpFhhd(random, 1, 1, ""));
 
                                 // todo persistAndRemove方法报错，为什么？
-								//ref.persistAndRemove();
+								ref.persistAndRemove();
 							} else {
 								double d = RandomUtils.nextDouble();
 								if (d >= 0.2) { // >=0 一定成立，则无删除
@@ -88,14 +88,14 @@ public class FunctionTest {
 									fhhd.update();
 
                                     // 直接persist需注释
-									//ref.persistAndRemove();
+									ref.persistAndRemove();
 								} else {
 									counter.addAndGet(-fhhd.getNCurToken());
 
 									fhhd.delete();
 
                                     // 直接persist需注释
-									//ref.persistAndRemove();
+									ref.persistAndRemove();
 								}
 							}
 						}

@@ -176,7 +176,6 @@ final class Segment extends ReentrantLock implements Serializable {
             return value;
         } finally {
             unlock();
-            postWriteCleanup();
         }
     }
 
@@ -200,7 +199,6 @@ final class Segment extends ReentrantLock implements Serializable {
             return value;
         } finally {
             unlock();
-            postWriteCleanup();
         }
     }
 
@@ -263,14 +261,15 @@ final class Segment extends ReentrantLock implements Serializable {
             return oldValue;
         } finally {
             unlock();
-            postWriteCleanup();
             watch.stop("put()完成");
         }
     }
 
     /**
      * Remove; match on key only if value null, else match both.
+     * 缓存这里不应直接调用remove
      */
+    @Deprecated
     AbsReference remove(String key, int hash, AbsReference value) {
         lock();
         try {
@@ -288,7 +287,6 @@ final class Segment extends ReentrantLock implements Serializable {
             return oldValue;
         } finally {
             unlock();
-            postWriteCleanup();
         }
     }
 
@@ -425,20 +423,6 @@ final class Segment extends ReentrantLock implements Serializable {
 
         for (HashEntry e = first; e != null; e = e.getNext()) {
             if (e == entry) {
-                // TODO 移除应该和persistQueue一起移除，但是为什么出现数据不一致且效率很低
-//                lock();
-//                try {
-//                    // 先从persistQueue删除所有元素
-//                    HashSet<CacheEntry> result = Sets.newHashSet();
-//                    result.addAll(entry.getQueueEntry().getDeletedSet());
-//                    result.addAll(entry.getQueueEntry().getNotDeletedSet());
-//                    for (CacheEntry cacheEntry : result) {
-//                        getPersistQueue().removeFromPersistQueue(cacheEntry);
-//                    }
-//                } finally {
-//                    unlock();
-//                }
-
                 // 是否remove后面的，再remove前面的 access 是copied 的？
                 ++modCount;
                 // 从链表1中删除元素entry，且返回链表2的头节点
@@ -515,28 +499,14 @@ final class Segment extends ReentrantLock implements Serializable {
         runLockedCleanup(now);
     }
 
-    /**
-     * Performs routine cleanup following a write.
-     */
-    void postWriteCleanup() {
-        runUnlockedCleanup();
-    }
-
     void cleanUp() {
         runLockedCleanup(CCUtils.now());
-        runUnlockedCleanup();
     }
 
     void runLockedCleanup(long now) {
         tryExpireEntries(now);
     }
 
-    void runUnlockedCleanup() {
-        // REMOVE 通知。。。
-        if (!isHeldByCurrentThread()) {
-            // map.processPendingNotifications();
-        }
-    }
 
     // 缓存读取，写入的对象都需要放入recencyQueue
     // 为什么要有recencyQueue？
@@ -608,7 +578,6 @@ final class Segment extends ReentrantLock implements Serializable {
             return handler.doInSegmentUnderLock(this, e);
         } finally {
             unlock();
-            postWriteCleanup();
         }
     }
 
