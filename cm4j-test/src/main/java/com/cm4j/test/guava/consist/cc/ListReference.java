@@ -7,7 +7,9 @@ import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -109,7 +111,9 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
                 }
                 entry.setDbState(DBState.P);
                 // 占位：发送到更新队列，状态P
-                ConcurrentCache.getInstance().sendToPersistQueue(entry);
+                // ConcurrentCache.getInstance().sendToPersistQueue(entry);
+
+                ConcurrentCache.getInstance().removeFromPersistQueue(entry);
             }
         }
     }
@@ -139,5 +143,10 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
         for (CacheEntry v : all_objects) {
             v.resetRef(this);
         }
+    }
+
+    @Override
+    public Set<CacheEntry> getNotDeletedSet() {
+        return new HashSet<CacheEntry>(all_objects);
     }
 }

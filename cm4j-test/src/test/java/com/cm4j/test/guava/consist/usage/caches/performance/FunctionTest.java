@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 40000; i++) { // 执行20000次
+				for (int i = 0; i < 200000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -73,30 +73,29 @@ public class FunctionTest {
                         synchronized (ref) {
 							TmpFhhd fhhd = ref.get();
 							if (fhhd == null) {
-								long num = counter.incrementAndGet();
+								counter.incrementAndGet();
 								
 								ref.update(new TmpFhhd(random, 1, 1, ""));
 
-                                // 直接persist需注释
-								// ref.persist();
+                                // todo persistAndRemove方法报错，为什么？
+								//ref.persistAndRemove();
 							} else {
 								double d = RandomUtils.nextDouble();
 								if (d >= 0.2) { // >=0 一定成立，则无删除
-									long num = counter.incrementAndGet();
+									counter.incrementAndGet();
 									
 									fhhd.increaseValue();
 									fhhd.update();
 
-									// todo 有新增或删除的persist为嘛会报错？？？
                                     // 直接persist需注释
-									// ref.persist();
+									//ref.persistAndRemove();
 								} else {
 									counter.addAndGet(-fhhd.getNCurToken());
 
 									fhhd.delete();
 
                                     // 直接persist需注释
-									// ref.persist();
+									//ref.persistAndRemove();
 								}
 							}
 						}

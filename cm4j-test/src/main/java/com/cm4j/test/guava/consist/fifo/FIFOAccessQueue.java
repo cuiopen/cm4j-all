@@ -90,6 +90,7 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
 
     @Override
     public int size() {
+        // TODO 这里应该用个变量记录size大小？
         int size = 0;
         for (IQueueEntry e = head.getNextInAccessQueue(); e != head; e = e.getNextInAccessQueue()) {
             size++;

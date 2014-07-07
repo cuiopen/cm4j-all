@@ -8,19 +8,21 @@ public class Constants {
     public static final int DEFAULT_INITIAL_CAPACITY = 16;
     // 加载因子
     public static final float DEFAULT_LOAD_FACTOR = 0.75f;
-    // TODO 默认设为16
+
     // 默认segment的个数
-    public static final int DEFAULT_CONCURRENCY_LEVEL = 1;
+    // 注意：极限情况16个segment同时写入数据，则会占用16个线程池资源
+    // 这时线程池配置要大于此数值，否则可能出现线程池资源耗尽导致程序全部锁定
+    public static final int DEFAULT_CONCURRENCY_LEVEL = 4;
     public static final int MAXIMUM_CAPACITY = 1 << 30;
     public static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
     public static final int RETRIES_BEFORE_LOCK = 2;
 
     // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    public static final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(500);
+    public static final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(5000);
     /**
      * TODO 更新队列检测间隔，单位s
      */
-    public static final int CHECK_UPDATE_QUEUE_INTERVAL = 3;
+    public static final int CHECK_UPDATE_QUEUE_INTERVAL = 10;
     /**
      * 间隔多少次检查，可持久化，总间隔时间也就是 5 * 60s = 5min
      */

@@ -15,7 +15,7 @@ import java.util.Set;
  * @author Yang.hao
  * @since 2013-3-2 上午10:42:59
  */
-abstract class AbsReference {
+public abstract class AbsReference {
 
     // 用于存放暂时未被删除对象
     // 里面对象只能被删除，不可更改状态
@@ -77,6 +77,7 @@ abstract class AbsReference {
     /**
      * 非deleteSet数据保存，deleteSet中数据在persistAndRemove()已经处理了<br />
      * <font color="red">此方法在lock下被调用</font>
+     * // todo 这里是否可不放到子类中实现，父类getNotDeletedSet可获得到所有entry
      */
     protected abstract void persistDB();
 
@@ -95,6 +96,12 @@ abstract class AbsReference {
      * @param attachedKey
      */
     protected abstract void attachedKey(String attachedKey);
+
+    /**
+     * 获取所有不在DeletedSet中的元素
+     * @return
+     */
+    public abstract Set<CacheEntry> getNotDeletedSet();
 
     /**
      * 持久化但不移除
@@ -120,7 +127,9 @@ abstract class AbsReference {
             hibernate.delete(v);
             changeDbState(v, DBState.P);
             // 占位：发送到更新队列，状态P
-            ConcurrentCache.getInstance().sendToPersistQueue(v);
+            // ConcurrentCache.getInstance().sendToPersistQueue(v);
+            // 从保存队列里面移除
+            ConcurrentCache.getInstance().removeFromPersistQueue(v);
         }
         getDeletedSet().clear();
     }

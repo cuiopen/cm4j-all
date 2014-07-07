@@ -6,6 +6,9 @@ import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * 单个缓存对象，一个reference只能存放一次对象
  *
@@ -100,7 +103,8 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
             changeDbState(this.v, DBState.P);
             // entry.setDbState(DBState.P);
             // 占位：发送到更新队列，状态P
-            ConcurrentCache.getInstance().sendToPersistQueue(this.v);
+            // ConcurrentCache.getInstance().sendToPersistQueue(this.v);
+            ConcurrentCache.getInstance().removeFromPersistQueue(v);
         }
     }
 
@@ -127,5 +131,14 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
         if (this.v != null) {
             this.v.resetRef(this);
         }
+    }
+
+    @Override
+    public Set<CacheEntry> getNotDeletedSet() {
+        HashSet<CacheEntry> set = new HashSet<CacheEntry>();
+        if (this.v != null) {
+            set.add(this.v);
+        }
+        return set;
     }
 }

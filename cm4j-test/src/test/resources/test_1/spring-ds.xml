@@ -30,7 +30,7 @@
 		<property name="user" value="${mysql.jdbc.username}" />
 		<property name="password" value="${mysql.jdbc.password}" />
 		<property name="minPoolSize" value="3" />
-		<property name="maxPoolSize" value="10" />
+		<property name="maxPoolSize" value="18" />
 		<property name="initialPoolSize" value="5" />
 		<property name="maxIdleTime" value="60" />
 		<property name="acquireIncrement" value="10" />

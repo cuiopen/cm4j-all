@@ -4,20 +4,19 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
+import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.service.ServiceManager;
+import com.google.common.collect.Lists;
 import org.hibernate.HibernateException;
 import org.hibernate.NonUniqueObjectException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
-import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Created by yanghao on 14-4-1.
@@ -25,15 +24,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class DBPersistQueue {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConcurrentLinkedQueue<CacheEntry> queue;
+    private final FIFOAccessQueue<CacheEntry> queue;
+    private final Segment segment;
 
     /**
      * 更新队列消费计数器
      */
     public long counter = 0L;
 
-    public DBPersistQueue() {
-        this.queue = new ConcurrentLinkedQueue<CacheEntry>();
+    public DBPersistQueue(Segment segment) {
+        this.segment = segment;
+        this.queue = new FIFOAccessQueue<CacheEntry>();
     }
 
     /**
@@ -49,12 +50,24 @@ public class DBPersistQueue {
 
         // 最好是提供一个自动加入到队列尾部的高并发队列 [待扩展]
 
-        // 先从队列删除
-        queue.remove(entry);
+//        // 先从队列删除
+//        queue.remove(entry);
+//        // 重置persist信息
+//        entry.mirror();
+//        // 加入到队列尾部
+//        queue.add(entry);
+
+
+        // 这里是否要先从persistQueue remove再offer ？
+        // 应该不用，这里是在锁下面执行的
+
         // 重置persist信息
         entry.mirror();
-        // 加入到队列尾部
-        queue.add(entry);
+        queue.offer(entry);
+    }
+
+    public void removeFromPersistQueue(CacheEntry entry) {
+        queue.remove(entry);
     }
 
     /**
@@ -71,47 +84,55 @@ public class DBPersistQueue {
         int persistNum = 0;
 
         long currentCounter = counter++;
-        logger.error("定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queue.size(), doNow});
-        if (doNow || queue.size() >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (currentCounter) % Constants.PERSIST_CHECK_INTERVAL == 0) {
-            if (queue.size() == 0) {
-                logger.error("定时[{}]检测结束，queue内无数据", currentCounter);
-                return;
-            }
-            logger.debug("缓存存储数据开始");
+        int queueSize = queue.size();
+        logger.error(this.segment + ":定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queueSize, doNow});
+        if (doNow || queueSize >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (currentCounter) % Constants.PERSIST_CHECK_INTERVAL == 0) {
 
-            List<CacheEntry> toBatch = new ArrayList<CacheEntry>();
+            List<CacheEntry> toBatch = Lists.newArrayList();
 
-            CacheEntry wrapper;
-            while ((wrapper = queue.poll()) != null) {
-                final Slf4JStopWatch stopWatch = new Slf4JStopWatch();
-                wrapper.getIsChanged().set(true);
-
-                // 删除或者更新的num为0
-                IEntity entity = wrapper.mirrorEntity();
-                if (entity != null && DBState.P != wrapper.mirrorDBState()) {
-                    toBatch.add(wrapper);
+            List<CacheEntry> entries;
+            while (true) {
+                entries = this.segment.drainUnderLock(Constants.BATCH_TO_COMMIT);
+                if (entries.size() == 0) {
+                    logger.error(this.segment + ":定时[{}]检测结束，queue内无数据", currentCounter);
+                    break;
                 }
-                stopWatch.lap("持久queue找到需处理entry");
+
+                logger.debug(this.segment + ":缓存存储数据开始");
+
+                for (CacheEntry wrapper : entries) {
+                    wrapper.getIsChanged().set(true);
+
+                    // 删除或者更新的num为0
+                    IEntity entity = wrapper.mirrorEntity();
+                    if (entity != null && DBState.P != wrapper.mirrorDBState()) {
+                        toBatch.add(wrapper);
+                    }
+                }
 
                 // 条件：在toBatch大于0的情况下 (或关系)：
                 // 1.toBatch的大小达到 Constants.BATCH_TO_COMMIT
                 // 2.queue为空
-                if (toBatch.size() > 0 && (toBatch.size() % Constants.BATCH_TO_COMMIT == 0 || queue.size() == 0)) {
+
+                // && (toBatch.size() % Constants.BATCH_TO_COMMIT == 0 || queue.size() == 0)
+                if (toBatch.size() > 0 ) {
                     try {
-                        logger.debug("批处理大小：{}", toBatch.size());
+                        logger.debug(this.segment + ":批处理大小：{}", toBatch.size());
                         persistNum += toBatch.size();
                         batchPersistData(toBatch);
                     } catch (Exception e) {
-                        logger.error("缓存批处理异常", e);
+                        logger.error(this.segment + ":缓存批处理异常", e);
                     }
                     toBatch.clear();
-                    stopWatch.lap("持久queue批处理");
                 }
 
-                stopWatch.stop("持久queue循环结束");
+                if (entries.size() < Constants.BATCH_TO_COMMIT) {
+                    logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
+                    break;
+                }
             }
         }
-        logger.error("定时[{}]检测结束，本次存储大小为{}", currentCounter, persistNum);
+        logger.error(this.segment + ":定时[{}]检测结束，本次存储大小为{}", currentCounter, persistNum);
     }
 
     /**
@@ -153,7 +174,7 @@ public class DBPersistQueue {
             if (!(exception instanceof NonUniqueObjectException)) {
                 // 在删除时，如果同一个key的不同对象删除，会报NonUniqueObjectException，但这种情况比较少
                 // 可以参考：http://stackoverflow.com/questions/6518567/org-hibernate-nonuniqueobjectexception
-                logger.error("缓存批处理写入DB异常", exception);
+                logger.error(this.segment + ":缓存批处理写入DB异常", exception);
             }
             for (CacheEntry wrapper : entities) {
                 try {
@@ -168,29 +189,19 @@ public class DBPersistQueue {
                     // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
                     ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
                 } catch (DataAccessException e1) {
-                    logger.error("批处理失败，单条更新失败", e1);
+                    logger.error(this.segment + ":批处理失败，单条更新失败", e1);
                 }
             }
         } finally {
             try {
                 session.close();
             } catch (HibernateException e) {
-                logger.error("批处理失败，session.close()异常", e);
+                logger.error(this.segment + ":批处理失败，session.close()异常", e);
             }
         }
     }
 
-    public static void main(String[] args) {
-        ConcurrentLinkedQueue queue1 = new ConcurrentLinkedQueue();
-        for (int i = 0; i < 80000; i++) {
-            queue1.offer(i);
-        }
-        long start = System.currentTimeMillis();
-        while (queue1.poll() != null){
-
-        }
-        long end = System.currentTimeMillis();
-
-        System.out.println(end - start);
+    public FIFOAccessQueue<CacheEntry> getQueue() {
+        return queue;
     }
 }

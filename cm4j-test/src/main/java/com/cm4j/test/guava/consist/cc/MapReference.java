@@ -7,6 +7,7 @@ import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class MapReference<K, V extends CacheEntry> extends AbsReference {
 
+    // todo 有必要用并发包吗？？？
     private Map<K, V> map = new ConcurrentHashMap<K, V>();
 
     public MapReference(Map<K, V> map) {
@@ -117,7 +119,8 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
                 }
                 entry.setDbState(DBState.P);
                 // 占位：发送到更新队列，状态P
-                ConcurrentCache.getInstance().sendToPersistQueue(entry);
+                // ConcurrentCache.getInstance().sendToPersistQueue(entry);
+                ConcurrentCache.getInstance().removeFromPersistQueue(entry);
             }
         }
     }
@@ -150,5 +153,10 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
         for (CacheEntry v : map.values()) {
             v.resetRef(this);
         }
+    }
+
+    @Override
+    public Set<CacheEntry> getNotDeletedSet() {
+        return new HashSet<CacheEntry>(map.values());
     }
 }

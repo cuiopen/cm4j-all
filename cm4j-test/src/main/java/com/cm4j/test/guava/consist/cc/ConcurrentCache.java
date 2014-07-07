@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,17 +51,6 @@ public class ConcurrentCache {
     final Segment[] segments;
 
     private final ScheduledExecutorService service;
-    private final DBPersistQueue persistQueue;
-
-    /* ---------------- Small Utilities -------------- */
-    private static int rehash(int h) {
-        h += (h << 15) ^ 0xffffcd7d;
-        h ^= (h >>> 10);
-        h += (h << 3);
-        h ^= (h >>> 6);
-        h += (h << 2) + (h << 14);
-        return h ^ (h >>> 16);
-    }
 
     private final Segment segmentFor(int hash) {
         return segments[(hash >>> segmentShift) & segmentMask];
@@ -81,7 +69,7 @@ public class ConcurrentCache {
         }
 
         this.loader = loader;
-        this.persistQueue = new DBPersistQueue();
+
 
         if (concurrencyLevel > Constants.MAX_SEGMENTS) {
             concurrencyLevel = Constants.MAX_SEGMENTS;
@@ -108,23 +96,25 @@ public class ConcurrentCache {
             cap <<= 1;
 
         for (int i = 0; i < this.segments.length; ++i) {
-            this.segments[i] = new Segment(cap, loadFactor);
+            this.segments[i] = new Segment(cap, loadFactor, "segment-" + (i+1));
         }
 
         // 定时处理器
-        service = Executors.newScheduledThreadPool(1);
-        service.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                persistQueue.consumePersistQueue(false);
-            }
-        }, 1, Constants.CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
+        service = Executors.newScheduledThreadPool(segments.length);
+        for (final Segment segment : segments) {
+            service.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    segment.getPersistQueue().consumePersistQueue(false);
+                }
+            }, 1, Constants.CHECK_UPDATE_QUEUE_INTERVAL, TimeUnit.SECONDS);
+        }
     }
 
     @SuppressWarnings("unchecked")
     public <V extends AbsReference> V get(CacheDefiniens<V> desc) {
         String key = desc.getKey();
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return (V) segmentFor(hash).get(key, hash, loader, true);
     }
 
@@ -136,7 +126,7 @@ public class ConcurrentCache {
     @SuppressWarnings("unchecked")
     public <V extends AbsReference> V getIfPresent(CacheDefiniens<V> desc) {
         String key = desc.getKey();
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return (V) segmentFor(hash).get(key, hash, loader, false);
     }
 
@@ -150,7 +140,7 @@ public class ConcurrentCache {
     @SuppressWarnings("unchecked")
     public <V extends AbsReference> V refresh(CacheDefiniens<V> desc) {
         String key = desc.getKey();
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return (V) segmentFor(hash).refresh(key, hash, loader);
     }
 
@@ -160,7 +150,7 @@ public class ConcurrentCache {
         Preconditions.checkNotNull(value);
 
         String key = desc.getKey();
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return (V) segmentFor(hash).put(key, hash, value, false);
     }
 
@@ -173,7 +163,7 @@ public class ConcurrentCache {
         Preconditions.checkNotNull(value);
 
         String key = desc.getKey();
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return (V) segmentFor(hash).put(key, hash, value, true);
     }
 
@@ -197,8 +187,8 @@ public class ConcurrentCache {
         Preconditions.checkNotNull(key, "key不能为null");
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
-        final int hash = rehash(key.hashCode());
-        segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+        final int hash = CCUtils.rehash(key.hashCode());
+        segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
                 if (e != null && e.getQueueEntry() != null && !e.getQueueEntry().isAllPersist()) {
@@ -207,6 +197,7 @@ public class ConcurrentCache {
                     // 非deleteSet数据保存
                     e.getQueueEntry().persistDB();
                     if (isRemove) {
+                        // todo 这里没有从持久化队列里面移除？？？
                         segment.removeEntry(e, hash);
                     }
                 }
@@ -216,19 +207,15 @@ public class ConcurrentCache {
     }
 
     public AbsReference remove(String key) {
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return segmentFor(hash).remove(key, hash, null);
     }
 
     public boolean remove(String key, AbsReference value) {
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         if (value == null)
             return false;
         return segmentFor(hash).remove(key, hash, value) != null;
-    }
-
-    public void remove(CacheDefiniens<? extends AbsReference> desc) {
-        remove(desc.getKey());
     }
 
     public void clear() {
@@ -279,7 +266,7 @@ public class ConcurrentCache {
     }
 
     public boolean containsKey(String key) {
-        int hash = rehash(key.hashCode());
+        int hash = CCUtils.rehash(key.hashCode());
         return segmentFor(hash).containsKey(key, hash);
     }
 
@@ -324,11 +311,11 @@ public class ConcurrentCache {
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
 
         final String key = entry.ref().getAttachedKey();
-        int hash = rehash(key.hashCode());
-        boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Boolean>() {
+        int hash = CCUtils.rehash(key.hashCode());
+        boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Boolean>() {
             @Override
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
                     // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
                     if (entry.getIsChanged().get()) {
                         return false;
@@ -359,11 +346,11 @@ public class ConcurrentCache {
         Preconditions.checkState(DBState.P != dbState, "DbState不允许为持久化");
 
         final String key = entry.ref().getAttachedKey();
-        int hash = rehash(key.hashCode());
-        segmentFor(hash).doInSegmentUnderLock(key, hash, new SegmentLockHandler<Void>() {
+        int hash = CCUtils.rehash(key.hashCode());
+        segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, Segment.now())) {
+                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
                     // 更改CacheEntry的状态
                     if (e.getQueueEntry().changeDbState(entry, dbState)) {
                         return null;
@@ -399,11 +386,7 @@ public class ConcurrentCache {
         return false;
     }
 
-    static interface SegmentLockHandler<R> {
-        R doInSegmentUnderLock(Segment segment, HashEntry e);
-    }
-
-	/*
+    /*
      * ================== utils =====================
 	 */
 
@@ -413,7 +396,15 @@ public class ConcurrentCache {
      * @param entry
      */
     void sendToPersistQueue(CacheEntry entry) {
-        persistQueue.sendToPersistQueue(entry);
+        String key = entry.ref().getAttachedKey();
+        int hash = CCUtils.rehash(key.hashCode());
+        segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
+    }
+
+    void removeFromPersistQueue(CacheEntry entry) {
+        String key = entry.ref().getAttachedKey();
+        int hash = CCUtils.rehash(key.hashCode());
+        segmentFor(hash).getPersistQueue().removeFromPersistQueue(entry);
     }
 
     // 缓存关闭标识
@@ -426,20 +417,25 @@ public class ConcurrentCache {
         logger.error("stop()启动，缓存被关闭，等待写入线程完成...");
         Stopwatch watch = new Stopwatch().start();
         stop.set(true);
-        Future<?> future = service.submit(new Runnable() {
-            @Override
-            public void run() {
-                persistQueue.consumePersistQueue(true);
-            }
-        });
+
+        for (final Segment segment : segments) {
+            service.submit(new Runnable() {
+                @Override
+                public void run() {
+                    segment.getPersistQueue().consumePersistQueue(true);
+                }
+            });
+        }
+
         try {
-            // TODO 测试用，临时改为min
+            service.shutdown();
+
             // 阻塞等待线程完成, 90s时间
-            future.get(90, TimeUnit.MINUTES);
+            // TODO 测试数值，一般不用写这么久数据
+            service.awaitTermination(5, TimeUnit.MINUTES);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        service.shutdown();
 
         watch.stop();
         logger.error("stop()运行时间:{}ms", watch.elapsedMillis());

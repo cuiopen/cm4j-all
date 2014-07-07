@@ -4,12 +4,14 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,12 +45,11 @@ final class Segment extends ReentrantLock implements Serializable {
         return new Segment[i];
     }
 
-    public static long now() {
-        return System.nanoTime();
-    }
+    private final String name;
 
-    Segment(int initialCapacity, float lf) {
+    Segment(int initialCapacity, float lf, String name) {
         loadFactor = lf;
+        this.name = name;
         setTable(HashEntry.newArray(initialCapacity));
     }
 
@@ -111,7 +112,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 HashEntry e = getEntry(key, hash);
                 if (e != null) {
                     // 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
-                    AbsReference value = getLiveValue(key, hash, now());
+                    AbsReference value = getLiveValue(key, hash, CCUtils.now());
                     if (value != null) {
                         watch.lap("get.缓存获取到");
                         recordAccess(e);
@@ -139,7 +140,7 @@ final class Segment extends ReentrantLock implements Serializable {
         lock();
         try {
             // re-read ticker once inside the lock
-            long now = now();
+            long now = CCUtils.now();
             preWriteCleanup(now);
 
             int newCount = this.count - 1;
@@ -183,7 +184,7 @@ final class Segment extends ReentrantLock implements Serializable {
         lock();
         try {
             // re-read ticker once inside the lock
-            long now = now();
+            long now = CCUtils.now();
             preWriteCleanup(now);
 
             // 获取且保存
@@ -205,7 +206,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
     boolean containsKey(String key, int hash) {
         if (count != 0) { // read-volatile
-            long now = now();
+            long now = CCUtils.now();
 
             lock();
             try {
@@ -222,7 +223,7 @@ final class Segment extends ReentrantLock implements Serializable {
         final StopWatch watch = new Slf4JStopWatch();
         lock();
         try {
-            preWriteCleanup(now());
+            preWriteCleanup(CCUtils.now());
 
             int c = count;
             if (c++ > threshold) { // ensure capacity
@@ -273,7 +274,7 @@ final class Segment extends ReentrantLock implements Serializable {
     AbsReference remove(String key, int hash, AbsReference value) {
         lock();
         try {
-            preWriteCleanup(now());
+            preWriteCleanup(CCUtils.now());
 
             HashEntry e = getEntry(key, hash);
             AbsReference oldValue = null;
@@ -302,6 +303,9 @@ final class Segment extends ReentrantLock implements Serializable {
                 accessQueue.clear();
                 ++modCount;
                 count = 0; // write-volatile
+
+                // todo 是否该放到这里??? 清除PersistQueue
+                getPersistQueue().getQueue().clear();
             } finally {
                 unlock();
             }
@@ -367,20 +371,7 @@ final class Segment extends ReentrantLock implements Serializable {
         watch.stop("rehash()完成");
     }
 
-    <R> R doInSegmentUnderLock(String key, int hash, ConcurrentCache.SegmentLockHandler<R> handler) {
-        lock();
-        preWriteCleanup(now());
-        try {
-            HashEntry e = getFirst(hash);
-            while (e != null && (e.getHash() != hash || !key.equals(e.getKey())))
-                e = e.getNext();
 
-            return handler.doInSegmentUnderLock(this, e);
-        } finally {
-            unlock();
-            postWriteCleanup();
-        }
-    }
 
     // expiration，过期相关业务
 
@@ -434,6 +425,20 @@ final class Segment extends ReentrantLock implements Serializable {
 
         for (HashEntry e = first; e != null; e = e.getNext()) {
             if (e == entry) {
+                // TODO 移除应该和persistQueue一起移除，但是为什么出现数据不一致且效率很低
+//                lock();
+//                try {
+//                    // 先从persistQueue删除所有元素
+//                    HashSet<CacheEntry> result = Sets.newHashSet();
+//                    result.addAll(entry.getQueueEntry().getDeletedSet());
+//                    result.addAll(entry.getQueueEntry().getNotDeletedSet());
+//                    for (CacheEntry cacheEntry : result) {
+//                        getPersistQueue().removeFromPersistQueue(cacheEntry);
+//                    }
+//                } finally {
+//                    unlock();
+//                }
+
                 // 是否remove后面的，再remove前面的 access 是copied 的？
                 ++modCount;
                 // 从链表1中删除元素entry，且返回链表2的头节点
@@ -518,7 +523,7 @@ final class Segment extends ReentrantLock implements Serializable {
     }
 
     void cleanUp() {
-        runLockedCleanup(now());
+        runLockedCleanup(CCUtils.now());
         runUnlockedCleanup();
     }
 
@@ -544,7 +549,7 @@ final class Segment extends ReentrantLock implements Serializable {
      * 2.增加到访问对列的尾部
      */
     void recordAccess(HashEntry e) {
-        e.setAccessTime(now());
+        e.setAccessTime(CCUtils.now());
         recencyQueue.add(e);
     }
 
@@ -565,5 +570,50 @@ final class Segment extends ReentrantLock implements Serializable {
 
     private boolean isExpired(HashEntry entry, long now) {
         return (now - entry.getAccessTime() > Constants.expireAfterAccessNanos);
+    }
+
+    // 持久化队列，用于替换DBPersistQueue
+    private final DBPersistQueue persistQueue = new DBPersistQueue(this);
+
+    public DBPersistQueue getPersistQueue() {
+        return persistQueue;
+    }
+
+    // 加锁，一次从里面获取size个数据
+    public List<CacheEntry> drainUnderLock(int size) {
+        List<CacheEntry> result = Lists.newArrayList();
+        lock();
+        try {
+            int counter = 0;
+            CacheEntry e;
+            while (counter++ < size && (e = persistQueue.getQueue().poll()) != null) {
+                result.add(e);
+            }
+            return result;
+        } finally {
+            unlock();
+        }
+    }
+
+    // ----------------------- lock handler -----------------------
+
+    <R> R doInSegmentUnderLock(String key, int hash, CCUtils.SegmentLockHandler<R> handler) {
+        lock();
+        preWriteCleanup(CCUtils.now());
+        try {
+            HashEntry e = getFirst(hash);
+            while (e != null && (e.getHash() != hash || !key.equals(e.getKey())))
+                e = e.getNext();
+
+            return handler.doInSegmentUnderLock(this, e);
+        } finally {
+            unlock();
+            postWriteCleanup();
+        }
+    }
+
+    @Override
+    public String toString() {
+        return this.name;
     }
 }

@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 2013-1-18 上午09:25:24
  * 
  */
-abstract class CacheEntry extends FIFOEntry<AbsReference> {
+public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 
 	/**
 	 * 缓存状态 - 默认持久化
