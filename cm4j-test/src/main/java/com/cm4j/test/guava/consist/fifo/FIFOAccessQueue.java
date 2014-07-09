@@ -35,6 +35,11 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
         public void setPreviousInAccessQueue(IQueueEntry previous) {
             this.previousAccess = previous;
         }
+
+        @Override
+        public String toString() {
+            return "FIFO_ENTRY_HEAD";
+        }
     };
 
     @Override
@@ -150,15 +155,9 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
         queue.offer(a);
         queue.offer(b);
         queue.offer(c);
-        queue.offer(d);
 
         queue.offer(b);
 
-        System.out.println(queue.size());
-
-        FIFOEntry e;
-        while ((e = queue.poll()) != null) {
-            System.out.println(e);
-        }
+        System.out.println(queue.remove(d));;
     }
 }

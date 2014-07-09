@@ -23,4 +23,9 @@ public enum NullEntry implements IQueueEntry {
     @Override
     public void setPreviousInAccessQueue(IQueueEntry previous) {
     }
+
+    @Override
+    public String toString() {
+        return "FIFO_ENTRY_NULL";
+    }
 }

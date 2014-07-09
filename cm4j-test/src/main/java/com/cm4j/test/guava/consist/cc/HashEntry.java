@@ -46,4 +46,9 @@ final class HashEntry extends FIFOEntry<AbsReference> {
     public void setAccessTime(long time) {
         this.accessTime = time;
     }
+
+    @Override
+    public String toString() {
+        return this.key;
+    }
 }

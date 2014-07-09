@@ -206,6 +206,7 @@ public class ConcurrentCache {
                         for (CacheEntry cacheEntry : result) {
                             segment.getPersistQueue().removeFromPersistQueue(cacheEntry);
                         }
+                        // todo 有可能从persistQueue移除后，又有其他线程导致状态变化？
                         segment.removeEntry(e, hash);
                     }
                 }
