@@ -1,6 +1,7 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
+import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.junit.Test;
@@ -33,6 +34,10 @@ public class BusinessTest {
         }
         ref.persistAndRemove();
 
+        System.out.println(ConcurrentCache.getInstance().contains(new TmpFhhdCache(1)));
+
+        // 上面移除了，这里又update怎么办？
+        // 应该报错啊
         fhhd.increaseValue();
         fhhd.update();
         ref.persistAndRemove();

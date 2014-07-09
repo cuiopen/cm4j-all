@@ -73,30 +73,30 @@ public class FunctionTest {
                         synchronized (ref) {
 							TmpFhhd fhhd = ref.get();
 							if (fhhd == null) {
-								counter.incrementAndGet();
-								
-								ref.update(new TmpFhhd(random, 1, 1, ""));
+                                ref.update(new TmpFhhd(random, 1, 1, ""));
 
-                                // todo persistAndRemove方法报错，为什么？
-								ref.persistAndRemove();
-							} else {
+                                // 直接persist需注释
+                                // ref.persistAndRemove();
+
+                                // 计数器放在最下面，保证上面执行成功后再计数
+                                counter.incrementAndGet();
+                            } else {
 								double d = RandomUtils.nextDouble();
 								if (d >= 0.2) { // >=0 一定成立，则无删除
-									counter.incrementAndGet();
-									
-									fhhd.increaseValue();
-									fhhd.update();
+                                    fhhd.increaseValue();
+                                    fhhd.update();
+
+                                    // ref.persistAndRemove();
+
+                                    counter.incrementAndGet();
+                                } else {
+                                    fhhd.delete();
 
                                     // 直接persist需注释
-									ref.persistAndRemove();
-								} else {
-									counter.addAndGet(-fhhd.getNCurToken());
+                                    // ref.persistAndRemove();
 
-									fhhd.delete();
-
-                                    // 直接persist需注释
-									ref.persistAndRemove();
-								}
+                                    counter.addAndGet(-fhhd.getNCurToken());
+                                }
 							}
 						}
 

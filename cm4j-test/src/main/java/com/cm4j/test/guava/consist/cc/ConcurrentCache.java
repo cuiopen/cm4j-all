@@ -8,11 +8,9 @@ import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -193,38 +191,21 @@ public class ConcurrentCache {
         segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Void>() {
             @Override
             public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getQueueEntry() != null && !e.getQueueEntry().isAllPersist()) {
-                    // deleteSet数据保存
-                    e.getQueueEntry().persistDeleteSet();
-                    // 非deleteSet数据保存
-                    e.getQueueEntry().persistDB();
+                if (e != null && e.getQueueEntry() != null) {
+                    if (!e.getQueueEntry().isAllPersist()) {
+                        // deleteSet数据保存
+                        e.getQueueEntry().persistDeleteSet();
+                        // 非deleteSet数据保存
+                        e.getQueueEntry().persistDB();
+                    }
                     if (isRemove) {
-                        // todo 这里没有从持久化队列里面移除？？？
-                        HashSet<CacheEntry> result = Sets.newHashSet();
-                        result.addAll(e.getQueueEntry().getDeletedSet());
-                        result.addAll(e.getQueueEntry().getNotDeletedSet());
-                        for (CacheEntry cacheEntry : result) {
-                            segment.getPersistQueue().removeFromPersistQueue(cacheEntry);
-                        }
-                        // todo 有可能从persistQueue移除后，又有其他线程导致状态变化？
+                        // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
                         segment.removeEntry(e, hash);
                     }
                 }
                 return null;
             }
         });
-    }
-
-    public AbsReference remove(String key) {
-        int hash = CCUtils.rehash(key.hashCode());
-        return segmentFor(hash).remove(key, hash, null);
-    }
-
-    public boolean remove(String key, AbsReference value) {
-        int hash = CCUtils.rehash(key.hashCode());
-        if (value == null)
-            return false;
-        return segmentFor(hash).remove(key, hash, value) != null;
     }
 
     public void clear() {
@@ -400,7 +381,7 @@ public class ConcurrentCache {
 	 */
 
     /**
-     * 发送到更新队列
+     * 发送到persistQueue队列
      *
      * @param entry
      */
@@ -410,6 +391,10 @@ public class ConcurrentCache {
         segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
     }
 
+    /**
+     * 从persistQueue移除
+     * @param entry
+     */
     void removeFromPersistQueue(CacheEntry entry) {
         String key = entry.ref().getAttachedKey();
         int hash = CCUtils.rehash(key.hashCode());

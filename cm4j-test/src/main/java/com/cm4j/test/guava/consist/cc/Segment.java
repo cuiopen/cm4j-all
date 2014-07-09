@@ -415,6 +415,11 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    /**
+     * 从CC中移除entry，这里并没有从persistQueue中移除
+     * @param entry
+     * @param hash
+     */
     void removeEntry(HashEntry entry, int hash) {
         int c = count - 1;
         AtomicReferenceArray<HashEntry> tab = table;
