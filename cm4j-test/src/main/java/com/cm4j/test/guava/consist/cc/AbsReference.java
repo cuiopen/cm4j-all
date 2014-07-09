@@ -44,19 +44,6 @@ public abstract class AbsReference {
     protected abstract void updateEntry(CacheEntry e);
 
     /**
-     * 删除entry<br>
-     * 因为子类有范型，类型兼容问题，所以子类多写一个delete()方法来规定对象给外部调用，而此方法也转类型调用update()
-     *
-     * @param e
-     */
-    public void delete(CacheEntry e){
-        Preconditions.checkNotNull(e, "对象为null，无法delete");
-        Preconditions.checkNotNull(getNotDeletedSet().contains(e), "缓存中不包含此对象，无法删除");
-        // 注意顺序，先remove再change
-        ConcurrentCache.getInstance().changeDbState(e, DBState.D);
-    }
-
-    /**
      * 缓存中单个对象的修改后更改此对象的状态，此方法在lock下被调用
      *
      * @param entry
@@ -70,6 +57,19 @@ public abstract class AbsReference {
      * @return
      */
     public abstract Set<CacheEntry> getNotDeletedSet();
+
+    /**
+     * 删除entry<br>
+     * 因为子类有范型，类型兼容问题，所以子类多写一个delete()方法来规定对象给外部调用，而此方法也转类型调用update()
+     *
+     * @param e
+     */
+    public void delete(CacheEntry e){
+        Preconditions.checkNotNull(e, "对象为null，无法delete");
+        Preconditions.checkNotNull(getNotDeletedSet().contains(e), "缓存中不包含此对象，无法删除");
+        // 注意顺序，先remove再change
+        ConcurrentCache.getInstance().changeDbState(e, DBState.D);
+    }
 
 
     /**

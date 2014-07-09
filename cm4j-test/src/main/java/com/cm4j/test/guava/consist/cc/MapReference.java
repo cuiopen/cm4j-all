@@ -59,7 +59,6 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
         Preconditions.checkArgument(map.containsValue(value), "对象不存在，请通过put(K,V)增加对象到缓存中");
         // 存在则修改
         ConcurrentCache.getInstance().changeDbState(value, DBState.U);
-
     }
 
     public void delete(K key) {
