@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 50; i++) { // 执行20000次
+				for (int i = 0; i < 5000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -77,6 +77,7 @@ public class FunctionTest {
 
                                 // 直接persist需注释
                                 // ref.persistAndRemove();
+                                ref.persist();
 
                                 // 计数器放在最下面，保证上面执行成功后再计数
                                 counter.incrementAndGet();

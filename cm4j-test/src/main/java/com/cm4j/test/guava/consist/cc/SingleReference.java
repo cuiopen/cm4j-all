@@ -1,9 +1,6 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
-import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
 import java.util.HashSet;
@@ -79,36 +76,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
     }
 
     @Override
-    protected boolean allPersist() {
-        if (this.v != null && DBState.P != this.v.getDbState()) {
-            return false;
-        }
-        return true;
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    @Override
-    protected void persistDB() {
-        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-
-        // v数据处理
-        // 有可能对象被删除到deletedSet，entry则为null
-        if (this.v != null) {
-            IEntity entity = this.v.parseEntity();
-            if (DBState.U == this.v.getDbState()) {
-                hibernate.saveOrUpdate(entity);
-            } else if (DBState.D == this.v.getDbState()) {
-                hibernate.delete(entity);
-            }
-            changeDbState(this.v, DBState.P);
-            // entry.setDbState(DBState.P);
-            // 占位：发送到更新队列，状态P
-            // ConcurrentCache.getInstance().sendToPersistQueue(this.v);
-            ConcurrentCache.getInstance().removeFromPersistQueue(v);
-        }
-    }
-
-    @Override
     protected boolean changeDbState(CacheEntry entry, DBState dbState) {
         // deleteSet中数据状态修改
         if (checkAndDealDeleteSet(entry, dbState)) {
@@ -124,13 +91,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
             this.v = null;
         }
         return true;
-    }
-
-    @Override
-    protected void attachedKey(String attachedKey) {
-        if (this.v != null) {
-            this.v.resetRef(this);
-        }
     }
 
     @Override

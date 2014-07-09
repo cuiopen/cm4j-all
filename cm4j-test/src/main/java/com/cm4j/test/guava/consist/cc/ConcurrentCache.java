@@ -196,7 +196,7 @@ public class ConcurrentCache {
                         // deleteSet数据保存
                         e.getQueueEntry().persistDeleteSet();
                         // 非deleteSet数据保存
-                        e.getQueueEntry().persistDB();
+                        e.getQueueEntry().persistNotDeleteSet();
                     }
                     if (isRemove) {
                         // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update

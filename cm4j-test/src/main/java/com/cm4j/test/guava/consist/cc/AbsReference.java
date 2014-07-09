@@ -2,6 +2,7 @@ package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
+import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
 
@@ -51,6 +52,22 @@ public abstract class AbsReference {
     protected abstract void deleteEntry(CacheEntry e);
 
     /**
+     * 缓存中单个对象的修改后更改此对象的状态，此方法在lock下被调用
+     *
+     * @param entry
+     * @param dbState
+     * @return
+     */
+    protected abstract boolean changeDbState(CacheEntry entry, DBState dbState);
+
+    /**
+     * 获取所有不在DeletedSet中的元素
+     * @return
+     */
+    public abstract Set<CacheEntry> getNotDeletedSet();
+
+
+    /**
      * 是否所有对象都与数据库保持一致(状态P)
      * 缓存过期是否可移除的判断条件之一<br />
      * <font color="red">此方法在lock下被调用</font>
@@ -62,46 +79,35 @@ public abstract class AbsReference {
         if (getDeletedSet().size() > 0) {
             return false;
         }
-        return allPersist();
+        for (CacheEntry e : getNotDeletedSet()) {
+            if (DBState.P != e.getDbState()) {
+                return false;
+            }
+        }
+        return true;
     }
-
-    /**
-     * 非deleteSet的数据是否都是P的状态
-     * 缓存过期是否可移除的判断条件之一<br />
-     * <font color="red">此方法在lock下被调用</font>
-     *
-     * @return
-     */
-    protected abstract boolean allPersist();
 
     /**
      * 非deleteSet数据保存，deleteSet中数据在persistAndRemove()已经处理了<br />
      * <font color="red">此方法在lock下被调用</font>
-     * // todo 这里是否可不放到子类中实现，父类getNotDeletedSet可获得到所有entry
      */
-    protected abstract void persistDB();
+    protected void persistNotDeleteSet(){
+        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 
-    /**
-     * 缓存中单个对象的修改后更改此对象的状态，此方法在lock下被调用
-     *
-     * @param entry
-     * @param dbState
-     * @return
-     */
-    protected abstract boolean changeDbState(CacheEntry entry, DBState dbState);
-
-    /**
-     * 在从db获取数据之后，设置缓存内数据所属的key，用来辨识此对象是哪个缓存的
-     *
-     * @param attachedKey
-     */
-    protected abstract void attachedKey(String attachedKey);
-
-    /**
-     * 获取所有不在DeletedSet中的元素
-     * @return
-     */
-    public abstract Set<CacheEntry> getNotDeletedSet();
+        for (CacheEntry entry : getNotDeletedSet()) {
+            if (DBState.P != entry.getDbState()) {
+                IEntity entity = entry.parseEntity();
+                if (DBState.U == entry.getDbState()) {
+                    hibernate.saveOrUpdate(entity);
+                } else if (DBState.D == entry.getDbState()) {
+                    hibernate.delete(entity);
+                }
+                entry.setDbState(DBState.P);
+                // 从persistQueue移除
+                ConcurrentCache.getInstance().removeFromPersistQueue(entry);
+            }
+        }
+    }
 
     /**
      * 持久化但不移除
@@ -171,7 +177,10 @@ public abstract class AbsReference {
 
     protected void setAttachedKey(String attachedKey) {
         this.attachedKey = attachedKey;
-        attachedKey(attachedKey);
+
+        for (CacheEntry e : getNotDeletedSet()) {
+            e.resetRef(this);
+        }
     }
 
     public Set<CacheEntry> getDeletedSet() {
