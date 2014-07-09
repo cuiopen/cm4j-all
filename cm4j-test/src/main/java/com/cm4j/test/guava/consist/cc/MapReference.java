@@ -67,13 +67,6 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
         delete(v);
     }
 
-    public void delete(V v) {
-        Preconditions.checkNotNull(v, "参数不能为null");
-        Preconditions.checkNotNull(map.containsValue(v), "MapValue中不包含此对象，无法删除");
-        // 注意顺序，先remove再change
-        ConcurrentCache.getInstance().changeDbState(v, DBState.D);
-    }
-
 	/*
      * ================== extend methods ====================
 	 */
@@ -83,12 +76,6 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
         @SuppressWarnings("unchecked")
         V v = (V) e;
         this.update(v);
-    }
-
-    @Override
-    protected void deleteEntry(CacheEntry e) {
-        V v = (V) e;
-        this.delete(v);
     }
 
     @Override

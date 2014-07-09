@@ -56,15 +56,6 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
         ConcurrentCache.getInstance().changeDbState(v, DBState.U);
     }
 
-    /**
-     * 删除
-     */
-    public void delete(V e) {
-        Preconditions.checkState(all_objects.contains(e), "ListValue中不包含此对象，无法删除");
-        // 注意顺序，先remove再change
-        ConcurrentCache.getInstance().changeDbState(e, DBState.D);
-    }
-
 	/*
      * ================== extend methods ====================
 	 */
@@ -74,13 +65,6 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
         @SuppressWarnings("unchecked")
         V v = (V) e;
         this.update(v);
-    }
-
-    @Override
-    protected void deleteEntry(CacheEntry e) {
-        @SuppressWarnings("unchecked")
-        V v = (V) e;
-        this.delete(v);
     }
 
     @Override

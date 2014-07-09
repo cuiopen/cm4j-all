@@ -79,7 +79,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 */
 	public void delete() {
 		Preconditions.checkNotNull(this.ref());
-		this.ref().deleteEntry(this);
+		this.ref().delete(this);
 	}
 
 	/**

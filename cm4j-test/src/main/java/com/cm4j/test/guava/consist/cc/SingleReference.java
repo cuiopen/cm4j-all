@@ -51,10 +51,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
      * 从db删除，而不是移除缓存
      */
     public void delete() {
-        Preconditions.checkNotNull(this.v, "SingleValue中不包含对象，无法删除");
-
-        // 注意顺序，先remove再change
-        ConcurrentCache.getInstance().changeDbState(this.v, DBState.D);
+        delete(this.v);
     }
 
     /*
@@ -65,14 +62,6 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
         @SuppressWarnings("unchecked")
         V v = (V) e;
         this.update(v);
-    }
-
-    @Override
-    protected void deleteEntry(CacheEntry e) {
-        @SuppressWarnings("unchecked")
-        V v = (V) e;
-        Preconditions.checkArgument(this.v == v);
-        this.delete();
     }
 
     @Override

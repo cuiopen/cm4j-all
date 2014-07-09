@@ -49,7 +49,12 @@ public abstract class AbsReference {
      *
      * @param e
      */
-    protected abstract void deleteEntry(CacheEntry e);
+    public void delete(CacheEntry e){
+        Preconditions.checkNotNull(e, "对象为null，无法delete");
+        Preconditions.checkNotNull(getNotDeletedSet().contains(e), "缓存中不包含此对象，无法删除");
+        // 注意顺序，先remove再change
+        ConcurrentCache.getInstance().changeDbState(e, DBState.D);
+    }
 
     /**
      * 缓存中单个对象的修改后更改此对象的状态，此方法在lock下被调用
