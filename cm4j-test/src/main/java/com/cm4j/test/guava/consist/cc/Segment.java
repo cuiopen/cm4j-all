@@ -5,12 +5,14 @@ import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -267,7 +269,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
     /**
      * Remove; match on key only if value null, else match both.
-     * 缓存这里不应直接调用remove
+     * 注意：在functionTest测试有数值对不上
      */
     @Deprecated
     AbsReference remove(String key, int hash, AbsReference value) {
@@ -281,6 +283,15 @@ final class Segment extends ReentrantLock implements Serializable {
                 AbsReference v = e.getQueueEntry();
                 if (value == null || value.equals(v)) {
                     oldValue = v;
+
+                    // TODO 把缓存从persistQueue移除
+                    HashSet<CacheEntry> result = Sets.newHashSet(v.getDeletedSet());
+                    result.addAll(v.getNotDeletedSet());
+
+                    for (CacheEntry entry : result) {
+                        getPersistQueue().removeFromPersistQueue(entry);
+                    }
+
                     removeEntry(e, e.getHash());
                 }
             }

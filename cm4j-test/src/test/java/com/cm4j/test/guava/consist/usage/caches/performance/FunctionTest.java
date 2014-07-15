@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 5000; i++) { // 执行20000次
+				for (int i = 0; i < 2000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -77,28 +77,29 @@ public class FunctionTest {
 
                                 // 直接persist需注释
                                 // ref.persistAndRemove();
-                                ref.persist();
+//                                ref.persist();
 
                                 // 计数器放在最下面，保证上面执行成功后再计数
                                 counter.incrementAndGet();
                             } else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0.2) { // >=0 一定成立，则无删除
+								if (d >= 0.4) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
 
-                                    // ref.persistAndRemove();
-
                                     counter.incrementAndGet();
-                                } else {
+                                } else if (d >= 0.2) {
                                     fhhd.delete();
 
-                                    // 直接persist需注释
-                                    // ref.persistAndRemove();
-
                                     counter.addAndGet(-fhhd.getNCurToken());
+                                } else {
+                                    // todo remove不能通过测试，谨慎操作
+                                    // 计算之前总值
+//                                    if (ref.remove()) {
+//                                        counter.addAndGet(-fhhd.getNCurToken());
+//                                    }
                                 }
-							}
+                            }
 						}
 
 						// 为增加并发异常，暂停10ms

@@ -13,7 +13,6 @@ import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 
 import java.util.Collection;
 import java.util.List;
@@ -169,12 +168,16 @@ public class DBPersistQueue {
                 // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
                 ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
             }
-        } catch (HibernateException exception) {
-            tx.rollback();
+        } catch (Exception exception) {
             if (!(exception instanceof NonUniqueObjectException)) {
                 // 在删除时，如果同一个key的不同对象删除，会报NonUniqueObjectException，但这种情况比较少
                 // 可以参考：http://stackoverflow.com/questions/6518567/org-hibernate-nonuniqueobjectexception
                 logger.error(this.segment + ":缓存批处理写入DB异常", exception);
+            }
+            try {
+                tx.rollback();
+            } catch (HibernateException e) {
+                e.printStackTrace();
             }
             for (CacheEntry wrapper : entities) {
                 try {
@@ -188,14 +191,14 @@ public class DBPersistQueue {
                     }
                     // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
                     ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
-                } catch (DataAccessException e1) {
-                    logger.error(this.segment + ":批处理失败，单条更新失败", e1);
+                } catch (Exception e1) {
+                    logger.error(this.segment + ":批处理失败，单条[" + wrapper.ref().getAttachedKey() + "]更新失败", e1);
                 }
             }
         } finally {
             try {
                 session.close();
-            } catch (HibernateException e) {
+            } catch (Exception e) {
                 logger.error(this.segment + ":批处理失败，session.close()异常", e);
             }
         }

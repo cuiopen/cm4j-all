@@ -1,8 +1,6 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
-import com.cm4j.test.guava.consist.cc.ConcurrentCache;
-import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -27,19 +25,10 @@ public class BusinessTest {
 
     @Test
     public void funcTest() throws InterruptedException, BrokenBarrierException {
-        SingleReference<TmpFhhd> ref = new TmpFhhdCache(1).ref();
-        TmpFhhd fhhd = ref.get();
-        if (fhhd == null) {
-            ref.update(new TmpFhhd(1, 1, 1, ""));
-        }
-        ref.persistAndRemove();
+        TmpFhhd fhhd1 = new TmpFhhdCache(1).ref().get();
+        fhhd1.setNCurToken(10);
+        fhhd1.update();
 
-        System.out.println(ConcurrentCache.getInstance().contains(new TmpFhhdCache(1)));
-
-        // 上面移除了，这里又update怎么办？
-        // 应该报错啊
-        fhhd.increaseValue();
-        fhhd.update();
-        ref.persistAndRemove();
+        new TmpFhhdCache(1).ref().persist();
     }
 }

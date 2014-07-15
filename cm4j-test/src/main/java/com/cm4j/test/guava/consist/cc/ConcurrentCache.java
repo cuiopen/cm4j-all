@@ -208,6 +208,18 @@ public class ConcurrentCache {
         });
     }
 
+    public AbsReference remove(String key) {
+        int hash = CCUtils.rehash(key.hashCode());
+        return segmentFor(hash).remove(key, hash, null);
+    }
+
+    public boolean remove(String key, AbsReference value) {
+        int hash = CCUtils.rehash(key.hashCode());
+        if (value == null)
+            return false;
+        return segmentFor(hash).remove(key, hash, value) != null;
+    }
+
     public void clear() {
         for (int i = 0; i < segments.length; ++i)
             segments[i].clear();

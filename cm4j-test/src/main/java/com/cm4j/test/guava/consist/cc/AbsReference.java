@@ -73,6 +73,41 @@ public abstract class AbsReference {
 
 
     /**
+     * 持久化但不移除
+     */
+    public void persist() {
+        ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), false);
+    }
+
+    /**
+     * 持久化后移除<br />
+     * 这个方法一般是用于先移除缓存，然后手动改DB数值，最后缓存重新加载的就是更改后的数值
+     *
+     * <pre><font color=red>
+     * 调用这个方法有可能导致报RuntimeException: 缓存中不存在此对象[$1_157]，无法更改状态
+     * 原因：
+     * 如果一个线程已经从缓存获取到数据ref，此时调用此方法会把ref从缓存remove，
+     * 也就是缓存中已不存在此数据，如果持有线程再update或者delete，则无法更改缓存状态
+     * </font></pre>
+     */
+    public void persistAndRemove() {
+        ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), true);
+    }
+
+    /**
+     * 从缓存直接移除，而不保存db
+     *
+     * <pre><font color=red>
+     * 调用这个方法有可能导致报RuntimeException: 缓存中不存在此对象[$1_157]，无法更改状态
+     * 原因请参考：{@link #persistAndRemove()}
+     * </font></pre>
+     */
+    public boolean remove() {
+        Preconditions.checkNotNull(this.attachedKey);
+        return ConcurrentCache.getInstance().remove(this.attachedKey) != null;
+    }
+
+    /**
      * 是否所有对象都与数据库保持一致(状态P)
      * 缓存过期是否可移除的判断条件之一<br />
      * <font color="red">此方法在lock下被调用</font>
@@ -112,28 +147,6 @@ public abstract class AbsReference {
                 ConcurrentCache.getInstance().removeFromPersistQueue(entry);
             }
         }
-    }
-
-    /**
-     * 持久化但不移除
-     */
-    public void persist() {
-        ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), false);
-    }
-
-    /**
-     * 持久化后移除<br />
-     * <pre><font color=red>
-     * 这个方法一般是用于先移除缓存，然后手动改DB数值，最后缓存重新加载的就是更改后的数值
-     *
-     * 调用这个方法有可能导致报RuntimeException: 缓存中不存在此对象[$1_157]，无法更改状态
-     * 原因：
-     * 如果一个线程已经从缓存获取到数据ref，此时调用此方法会把ref从缓存remove，
-     * 也就是缓存中已不存在此数据，如果持有线程再update或者delete，则无法更改缓存状态
-     * </font></pre>
-     */
-    public void persistAndRemove() {
-        ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), true);
     }
 
     /**
