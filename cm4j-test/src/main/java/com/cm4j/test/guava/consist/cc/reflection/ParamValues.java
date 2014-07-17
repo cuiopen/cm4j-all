@@ -1,9 +1,12 @@
 package com.cm4j.test.guava.consist.cc.reflection;
 
 /**
+ * 将字符串转化为对应的类型
+ *
  * Created by yanghao on 14-7-15.
  */
-public enum ParamDefaultValue {
+public enum ParamValues {
+
     CHAR(char.class){
         @Override
         public Object translate(String param) {
@@ -71,15 +74,15 @@ public enum ParamDefaultValue {
 
     private Class clazz;
 
-    ParamDefaultValue(Class clazz) {
+    ParamValues(Class clazz) {
         this.clazz = clazz;
     }
 
     public abstract Object translate(String param);
 
-    public static ParamDefaultValue get(Class clazz) {
-        ParamDefaultValue[] values = ParamDefaultValue.values();
-        for (ParamDefaultValue value : values) {
+    public static ParamValues get(Class clazz) {
+        ParamValues[] values = ParamValues.values();
+        for (ParamValues value : values) {
             if (value.clazz.isAssignableFrom(clazz)) {
                 return value;
             }

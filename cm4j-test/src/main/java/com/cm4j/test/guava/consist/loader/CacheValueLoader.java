@@ -3,7 +3,7 @@ package com.cm4j.test.guava.consist.loader;
 import com.cm4j.test.guava.consist.cc.AbsReference;
 import com.cm4j.test.guava.consist.cc.reflection.CCReflection;
 import com.cm4j.test.guava.consist.cc.reflection.ConstructorStruct;
-import com.cm4j.test.guava.consist.cc.reflection.ParamDefaultValue;
+import com.cm4j.test.guava.consist.cc.reflection.ParamValues;
 import com.cm4j.test.guava.consist.keys.KEYS;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -46,7 +46,7 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
                 Class<?>[] paramsType = struct.getParamsType();
                 Object[] paramDefaultValue = new Object[paramsType.length];
                 for (int i = 0; i < paramsType.length; i++) {
-                    paramDefaultValue[i] = ParamDefaultValue.get(paramsType[i]).translate(params[i]);
+                    paramDefaultValue[i] = ParamValues.get(paramsType[i]).translate(params[i]);
                 }
                 // 构造对象
                 desc = (CacheDefiniens) struct.getConstructor().newInstance(paramDefaultValue);
