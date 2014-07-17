@@ -33,26 +33,27 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 			Class<? extends CacheDefiniens<?>> clazz = mappping.getCacheDesc();
             List<ConstructorStruct> constructorStruct = CCReflection.getConstructorStruct(clazz);
 
-            CacheDefiniens desc = null;
-            for (ConstructorStruct struct : constructorStruct) {
-                // 默认取第一个有参构造函数来构造对象
-                if (struct.isHasParams()) {
-                    String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
+            Preconditions.checkArgument(constructorStruct.size() == 1,
+                    "缓存" + clazz.getSimpleName() + "必须有一个构造函数");
 
-                    Class<?>[] paramsType = struct.getParamsType();
-                    Object[] paramDefaultValue = new Object[paramsType.length];
-                    for (int i = 0; i < paramsType.length; i++) {
-                        paramDefaultValue[i] = ParamDefaultValue.get(paramsType[i]).translate(params[i]);
-                    }
-                    // 构造对象
-                    desc = (CacheDefiniens) struct.getConstructor().newInstance(paramDefaultValue);
-                    break;
+            CacheDefiniens desc = null;
+            ConstructorStruct struct = constructorStruct.get(0);
+
+            // 默认取第一个有参构造函数来构造对象
+            if (struct.isHasParams()) {
+                String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
+
+                Class<?>[] paramsType = struct.getParamsType();
+                Object[] paramDefaultValue = new Object[paramsType.length];
+                for (int i = 0; i < paramsType.length; i++) {
+                    paramDefaultValue[i] = ParamDefaultValue.get(paramsType[i]).translate(params[i]);
                 }
+                // 构造对象
+                desc = (CacheDefiniens) struct.getConstructor().newInstance(paramDefaultValue);
+            } else {
+                desc = clazz.newInstance();
             }
 
-            //CacheDefiniens desc = clazz.newInstance();
-
-            // todo 采用反射获取构造方式传参进去调用??
 			AbsReference result = desc.load();
 			Preconditions.checkNotNull(result);
 			return result;

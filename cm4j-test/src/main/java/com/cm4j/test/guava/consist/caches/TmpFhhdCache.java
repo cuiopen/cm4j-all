@@ -5,7 +5,6 @@ import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
 
 public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
 

@@ -16,13 +16,6 @@ import com.google.common.base.Preconditions;
 public abstract class CacheDefiniens<V extends AbsReference> {
 
     private final String key;
-
-    /**
-     * 仅反射时使用
-     */
-	protected CacheDefiniens() {
-        this.key = null;
-	}
 	
 	/**
 	 * 子类可调用本方法，用可变数值做参数<br>
@@ -34,7 +27,7 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 		}
 
         PrefixMappping mapping = PrefixMappping.getMapping(this);
-        Preconditions.checkNotNull(mapping, "此缓存未在PrefixMappping进行映射：" + this.getClass().getSimpleName());
+        Preconditions.checkNotNull(mapping, "请先在PrefixMappping进行配置此缓存映射：" + this.getClass().getSimpleName());
         this.key = new JOINER(mapping.name(), params).key();
 	}
 
