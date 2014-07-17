@@ -1,11 +1,15 @@
 package com.cm4j.test.guava.consist.loader;
 
-import org.apache.commons.lang.ArrayUtils;
-
 import com.cm4j.test.guava.consist.cc.AbsReference;
+import com.cm4j.test.guava.consist.cc.reflection.CCReflection;
+import com.cm4j.test.guava.consist.cc.reflection.ConstructorStruct;
+import com.cm4j.test.guava.consist.cc.reflection.ParamDefaultValue;
 import com.cm4j.test.guava.consist.keys.KEYS;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import org.apache.commons.lang.ArrayUtils;
+
+import java.util.List;
 
 /**
  * 缓存值加载
@@ -16,12 +20,10 @@ import com.google.common.base.Throwables;
  */
 public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 
-	@SuppressWarnings("rawtypes")
 	@Override
 	public AbsReference load(String key) throws RuntimeException {
 		String[] keyInfo = KEYS.getKeyInfo(key);
 		String prefix = keyInfo[0];
-		String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
 
 		PrefixMappping mappping = PrefixMappping.valueOf(prefix);
 		Preconditions.checkNotNull(mappping);
@@ -29,9 +31,29 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 		try {
 			// 这里配的是无参数对象
 			Class<? extends CacheDefiniens<?>> clazz = mappping.getCacheDesc();
-			CacheDefiniens desc = clazz.newInstance();
-			
-			AbsReference result = desc.load(params);
+            List<ConstructorStruct> constructorStruct = CCReflection.getConstructorStruct(clazz);
+
+            CacheDefiniens desc = null;
+            for (ConstructorStruct struct : constructorStruct) {
+                // 默认取第一个有参构造函数来构造对象
+                if (struct.isHasParams()) {
+                    String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
+
+                    Class<?>[] paramsType = struct.getParamsType();
+                    Object[] paramDefaultValue = new Object[paramsType.length];
+                    for (int i = 0; i < paramsType.length; i++) {
+                        paramDefaultValue[i] = ParamDefaultValue.get(paramsType[i]).translate(params[i]);
+                    }
+                    // 构造对象
+                    desc = (CacheDefiniens) struct.getConstructor().newInstance(paramDefaultValue);
+                    break;
+                }
+            }
+
+            //CacheDefiniens desc = clazz.newInstance();
+
+            // todo 采用反射获取构造方式传参进去调用??
+			AbsReference result = desc.load();
 			Preconditions.checkNotNull(result);
 			return result;
 		} catch (Exception e) {

@@ -5,8 +5,6 @@ import com.cm4j.test.guava.consist.cc.MapReference;
 import com.cm4j.test.guava.consist.entity.TmpListMultikey;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang.math.NumberUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,20 +18,19 @@ import java.util.Map;
  */
 public class TmpListMultikeyMapCache extends CacheDefiniens<MapReference<Integer, TmpListMultikey>> {
 
-    public TmpListMultikeyMapCache() {
-    }
+    private int playerId;
 
     public TmpListMultikeyMapCache(int playerId) {
         super(playerId);
+        this.playerId = playerId;
     }
 
     @Override
-    public MapReference<Integer, TmpListMultikey> load(String... params) {
-        Preconditions.checkArgument(params.length == 1);
+    public MapReference<Integer, TmpListMultikey> load() {
         HibernateDao<TmpListMultikey, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         hibernate.setPersistentClass(TmpListMultikey.class);
         String hql = "from TmpListMultikey where id.NPlayerId = ?";
-        List<TmpListMultikey> all = hibernate.findAll(hql, NumberUtils.toInt(params[0]));
+        List<TmpListMultikey> all = hibernate.findAll(hql, playerId);
 
         Map<Integer, TmpListMultikey> map = new HashMap<Integer, TmpListMultikey>();
         for (TmpListMultikey tmpListMultikey : all) {

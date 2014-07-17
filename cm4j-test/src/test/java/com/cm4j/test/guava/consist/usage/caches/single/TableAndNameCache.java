@@ -7,8 +7,6 @@ import com.cm4j.test.guava.consist.entity.TestTable;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.usage.caches.vo.TableAndNameVO;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang.math.NumberUtils;
 
 import java.util.List;
 
@@ -17,18 +15,20 @@ import java.util.List;
  */
 public class TableAndNameCache extends CacheDefiniens<SingleReference<TableAndNameVO>> {
 
-	public TableAndNameCache(Object... params) {
-		super(params);
-	}
+    private int id;
 
-	@SuppressWarnings("rawtypes")
+	public TableAndNameCache(int id) {
+		super(id);
+        this.id = id;
+    }
+
 	@Override
-	public SingleReference<TableAndNameVO> load(String... params) {
-		Preconditions.checkArgument(params.length == 1);
+	public SingleReference<TableAndNameVO> load() {
 		HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 
 		String hql = "from TestTable t1, TestName t2 where t1.NId = t2.NId and t1.NId = ?";
-		List all = hibernate.findAll(hql, NumberUtils.toInt(params[0]));
+		List all = hibernate.findAll(hql, this.id);
+
 		Object[] vlaue = (Object[]) all.get(0);
 		TestTable testTable = (TestTable) vlaue[0];
 		TestName testName = (TestName) vlaue[1];

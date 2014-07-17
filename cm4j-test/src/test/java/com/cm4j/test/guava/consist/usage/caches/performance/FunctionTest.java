@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 2000; i++) { // 执行20000次
+				for (int i = 0; i < 200000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -83,12 +83,12 @@ public class FunctionTest {
                                 counter.incrementAndGet();
                             } else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0.4) { // >=0 一定成立，则无删除
+								if (d >= 0.2) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
 
                                     counter.incrementAndGet();
-                                } else if (d >= 0.2) {
+                                } else if (d >= 0) {
                                     fhhd.delete();
 
                                     counter.addAndGet(-fhhd.getNCurToken());

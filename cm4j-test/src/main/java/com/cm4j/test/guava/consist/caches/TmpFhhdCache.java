@@ -1,7 +1,5 @@
 package com.cm4j.test.guava.consist.caches;
 
-import org.apache.commons.lang.math.NumberUtils;
-
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
@@ -11,18 +9,32 @@ import com.google.common.base.Preconditions;
 
 public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
 
-	public TmpFhhdCache() {
-	}
-	
-	public TmpFhhdCache(int playerId) {
-		super(playerId);
-	}
+    private int playerId;
+
+    public TmpFhhdCache(int playerId) {
+        super(playerId);
+        this.playerId = playerId;
+    }
 
 	@Override
-	public SingleReference<TmpFhhd> load(String... params) {
-		Preconditions.checkArgument(params.length == 1);
+	public SingleReference<TmpFhhd> load() {
 		HibernateDao<TmpFhhd, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 		hibernate.setPersistentClass(TmpFhhd.class);
-		return new SingleReference<TmpFhhd>(hibernate.findById(NumberUtils.toInt(params[0])));
+
+        TmpFhhd fhhd = hibernate.findById(playerId);
+
+        // TODO 没有则新建
+//        if (fhhd == null) {
+//            fhhd = new TmpFhhd();
+//            fhhd.setNPlayerId(NumberUtils.toInt(params[0]));
+//            fhhd.setNCurToken(100);
+//
+//            SingleReference<TmpFhhd> ref = new SingleReference<TmpFhhd>(null);
+//
+//            ref.update(fhhd);
+//            return ref;
+//        }
+
+        return new SingleReference<TmpFhhd>(fhhd);
 	}
 }

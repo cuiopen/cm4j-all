@@ -41,11 +41,9 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 	/**
 	 * 从db加载
 	 * 
-	 * @param params
-	 *            就是初始化的对象数组，在做key时转化为string数组
 	 * @return
 	 */
-	public abstract V load(String... params);
+	public abstract V load();
 
 	public String getKey() {
 		return this.key;

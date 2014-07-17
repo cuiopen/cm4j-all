@@ -1,16 +1,13 @@
 package com.cm4j.test.guava.consist.caches;
 
-import java.util.List;
-
-import com.cm4j.test.guava.consist.loader.CacheDefiniens;
-import org.apache.commons.lang.math.NumberUtils;
-
 import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.ListReference;
 import com.cm4j.test.guava.consist.entity.TestTable;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Preconditions;
+
+import java.util.List;
 
 /**
  * 根据Value查询的缓存
@@ -21,16 +18,18 @@ import com.google.common.base.Preconditions;
  */
 public class TableValueListCache extends CacheDefiniens<ListReference<TestTable>> {
 
-	public TableValueListCache(Object... params) {
-		super(params);
-	}
+    private long value;
+
+	public TableValueListCache(long value) {
+		super(value);
+        this.value = value;
+    }
 
 	@Override
-	public ListReference<TestTable> load(String... params) {
-		Preconditions.checkArgument(params.length == 1);
+	public ListReference<TestTable> load() {
 		HibernateDao<TestTable, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 		hibernate.setPersistentClass(TestTable.class);
-		List<TestTable> all = hibernate.findAllByProperty("NValue", NumberUtils.toLong(params[0]));
+		List<TestTable> all = hibernate.findAllByProperty("NValue", value);
 		return new ListReference<TestTable>(all);
 	}
 
