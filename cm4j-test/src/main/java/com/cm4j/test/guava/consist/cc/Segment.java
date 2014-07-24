@@ -2,7 +2,7 @@ package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
-import com.cm4j.test.guava.consist.loader.CacheLoader;
+import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -107,8 +107,9 @@ final class Segment extends ReentrantLock implements Serializable {
 
     // called methods
 
-    AbsReference get(String key, int hash, CacheLoader<String, AbsReference> loader, boolean isLoad) {
+    AbsReference get(CacheDefiniens definiens, int hash, boolean isLoad) {
         final StopWatch watch = new Slf4JStopWatch();
+        final String key = definiens.getKey();
         try {
             if (count != 0) { // read-volatile
                 HashEntry e = getEntry(key, hash);
@@ -124,7 +125,7 @@ final class Segment extends ReentrantLock implements Serializable {
             }
             if (isLoad) {
                 // at this point e is either null or expired;
-                AbsReference ref = lockedGetOrLoad(key, hash, loader);
+                AbsReference ref = lockedGetOrLoad(definiens, hash);
                 watch.lap("get.锁定获取");
                 return ref;
             }
@@ -135,10 +136,11 @@ final class Segment extends ReentrantLock implements Serializable {
         return null;
     }
 
-    AbsReference lockedGetOrLoad(String key, int hash, CacheLoader<String, AbsReference> loader) {
+    AbsReference lockedGetOrLoad(CacheDefiniens definiens, int hash) {
         HashEntry e;
         AbsReference value;
 
+        final String key = definiens.getKey();
         lock();
         try {
             // re-read ticker once inside the lock
@@ -168,7 +170,7 @@ final class Segment extends ReentrantLock implements Serializable {
             }
 
             // 获取且保存
-            value = loader.load(key);
+            value = definiens.load();
             put(key, hash, value, false);
 
             return value;
@@ -177,23 +179,23 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
-    AbsReference refresh(String key, int hash, CacheLoader<String, AbsReference> loader) {
+    AbsReference refresh(CacheDefiniens definiens, int hash) {
+        final String key = definiens.getKey();
         lock();
         try {
             // re-read ticker once inside the lock
             long now = CCUtils.now();
             preWriteCleanup(now);
 
+            // todo refresh前是否需要把缓存从persistQueue删除？
             // 获取且保存
             StopWatch watch = new Slf4JStopWatch();
-            AbsReference value = loader.load(key);
+            AbsReference value = definiens.load();
             watch.stop("cache.loadFromDB()");
 
-            if (value != null) {
-                put(key, hash, value, false);
-            } else {
-                logger.debug("cache[{}] not found", key);
-            }
+            // 放入缓存
+            put(key, hash, value, false);
+
             return value;
         } finally {
             unlock();

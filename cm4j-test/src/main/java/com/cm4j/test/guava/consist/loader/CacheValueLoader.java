@@ -38,8 +38,8 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
 
             ConstructorStruct struct = constructorStruct.get(0);
 
-            CacheDefiniens desc;
             // 默认取第一个有参构造函数来构造对象
+            CacheDefiniens desc;
             if (struct.isHasParams()) {
                 String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
 

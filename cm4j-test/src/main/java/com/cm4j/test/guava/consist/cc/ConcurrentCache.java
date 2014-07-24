@@ -45,7 +45,6 @@ public class ConcurrentCache {
     }
 
     /* ---------------- Fields -------------- */
-    final CacheLoader<String, AbsReference> loader;
     final int segmentMask;
     final int segmentShift;
     final Segment[] segments;
@@ -67,9 +66,6 @@ public class ConcurrentCache {
         if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0 || loader == null) {
             throw new IllegalArgumentException();
         }
-
-        this.loader = loader;
-
 
         if (concurrencyLevel > Constants.MAX_SEGMENTS) {
             concurrencyLevel = Constants.MAX_SEGMENTS;
@@ -96,7 +92,7 @@ public class ConcurrentCache {
             cap <<= 1;
 
         for (int i = 0; i < this.segments.length; ++i) {
-            this.segments[i] = new Segment(cap, loadFactor, "segment-" + (i+1));
+            this.segments[i] = new Segment(cap, loadFactor, "segment-" + (i + 1));
         }
 
         // 定时处理器
@@ -112,10 +108,9 @@ public class ConcurrentCache {
     }
 
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V get(CacheDefiniens<V> desc) {
-        String key = desc.getKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        return (V) segmentFor(hash).get(key, hash, loader, true);
+    public <V extends AbsReference> V get(CacheDefiniens<V> definiens) {
+        int hash = CCUtils.rehash(definiens.getKey().hashCode());
+        return (V) segmentFor(hash).get(definiens, hash, true);
     }
 
     /**
@@ -124,24 +119,22 @@ public class ConcurrentCache {
      * @return 不存在时返回的reference为null
      */
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V getIfPresent(CacheDefiniens<V> desc) {
-        String key = desc.getKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        return (V) segmentFor(hash).get(key, hash, loader, false);
+    public <V extends AbsReference> V getIfPresent(CacheDefiniens<V> definiens) {
+        int hash = CCUtils.rehash(definiens.getKey().hashCode());
+        return (V) segmentFor(hash).get(definiens, hash, false);
     }
 
     /**
      * 重新从db加载数据
      *
      * @param <V>
-     * @param desc
+     * @param definiens
      * @return
      */
     @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V refresh(CacheDefiniens<V> desc) {
-        String key = desc.getKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        return (V) segmentFor(hash).refresh(key, hash, loader);
+    public <V extends AbsReference> V refresh(CacheDefiniens<V> definiens) {
+        int hash = CCUtils.rehash(definiens.getKey().hashCode());
+        return (V) segmentFor(hash).refresh(definiens, hash);
     }
 
     @SuppressWarnings("unchecked")
@@ -405,6 +398,7 @@ public class ConcurrentCache {
 
     /**
      * 从persistQueue移除
+     *
      * @param entry
      */
     void removeFromPersistQueue(CacheEntry entry) {
