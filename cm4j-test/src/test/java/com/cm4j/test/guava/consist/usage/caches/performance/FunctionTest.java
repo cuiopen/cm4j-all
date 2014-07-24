@@ -83,7 +83,7 @@ public class FunctionTest {
                                 counter.incrementAndGet();
                             } else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0.2) { // >=0 一定成立，则无删除
+								if (d >= 0) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
 

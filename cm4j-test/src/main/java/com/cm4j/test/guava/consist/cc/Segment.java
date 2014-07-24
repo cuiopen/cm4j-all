@@ -169,12 +169,8 @@ final class Segment extends ReentrantLock implements Serializable {
 
             // 获取且保存
             value = loader.load(key);
+            put(key, hash, value, false);
 
-            if (value != null) {
-                put(key, hash, value, false);
-            } else {
-                logger.debug("cache[{}] not found", key);
-            }
             return value;
         } finally {
             unlock();

@@ -16,10 +16,9 @@ import com.google.common.base.Preconditions;
 public abstract class CacheDefiniens<V extends AbsReference> {
 
     private final String key;
-	
+
 	/**
-	 * 子类可调用本方法，用可变数值做参数<br>
-	 * 或者新建一个无参构造函数用于{@link PrefixMappping}映射，有参构造函数则指明具体参数类型
+     * 本构造函数用于构建缓存Key，<font color=red>因此：子类必须调用此方法</font>
 	 */
 	protected CacheDefiniens(Object... params) {
 		for (Object param : params) {

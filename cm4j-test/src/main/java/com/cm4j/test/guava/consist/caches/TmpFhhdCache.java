@@ -25,7 +25,7 @@ public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
         // TODO 没有则新建
 //        if (fhhd == null) {
 //            fhhd = new TmpFhhd();
-//            fhhd.setNPlayerId(NumberUtils.toInt(params[0]));
+//            fhhd.setNPlayerId(playerId);
 //            fhhd.setNCurToken(100);
 //
 //            SingleReference<TmpFhhd> ref = new SingleReference<TmpFhhd>(null);

@@ -34,11 +34,11 @@ public class CacheValueLoader extends CacheLoader<String, AbsReference> {
             List<ConstructorStruct> constructorStruct = CCReflection.getConstructorStruct(clazz);
 
             Preconditions.checkArgument(constructorStruct.size() == 1,
-                    "缓存" + clazz.getSimpleName() + "必须有一个构造函数");
+                    "缓存" + clazz.getSimpleName() + "必须有且仅允许一个构造函数");
 
-            CacheDefiniens desc = null;
             ConstructorStruct struct = constructorStruct.get(0);
 
+            CacheDefiniens desc;
             // 默认取第一个有参构造函数来构造对象
             if (struct.isHasParams()) {
                 String[] params = (String[]) ArrayUtils.remove(keyInfo, 0);
