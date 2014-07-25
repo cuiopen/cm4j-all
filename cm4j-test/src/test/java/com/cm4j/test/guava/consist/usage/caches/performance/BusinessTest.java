@@ -29,14 +29,9 @@ public class BusinessTest {
         SingleReference<TmpFhhd> ref = new TmpFhhdCache(1).ref();
 
         TmpFhhd fhhd = ref.get();
-        if (fhhd == null) {
-            fhhd = new TmpFhhd();
-            fhhd.setNPlayerId(1);
-            ref.update(fhhd);
-        }
 
-        fhhd.setNCurToken(10);
-        fhhd.update();
+//        fhhd.setNCurToken(10);
+//        fhhd.update();
 
         new TmpFhhdCache(1).ref().persist();
     }

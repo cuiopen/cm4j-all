@@ -19,21 +19,17 @@ public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
 	public SingleReference<TmpFhhd> load() {
 		HibernateDao<TmpFhhd, Integer> hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 		hibernate.setPersistentClass(TmpFhhd.class);
-
-        TmpFhhd fhhd = hibernate.findById(playerId);
-
-        // TODO 没有则新建
-//        if (fhhd == null) {
-//            fhhd = new TmpFhhd();
-//            fhhd.setNPlayerId(playerId);
-//            fhhd.setNCurToken(100);
-//
-//            SingleReference<TmpFhhd> ref = new SingleReference<TmpFhhd>(null);
-//
-//            ref.update(fhhd);
-//            return ref;
-//        }
-
-        return new SingleReference<TmpFhhd>(fhhd);
+        return new SingleReference<TmpFhhd>(hibernate.findById(playerId));
 	}
+
+    @Override
+    public void afterLoad(SingleReference<TmpFhhd> ref) {
+        if (ref.get() == null) {
+            TmpFhhd fhhd = new TmpFhhd();
+            fhhd.setNPlayerId(playerId);
+            fhhd.setNCurToken(200);
+
+            ref.update(fhhd);
+        }
+    }
 }

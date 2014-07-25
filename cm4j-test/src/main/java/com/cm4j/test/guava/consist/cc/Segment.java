@@ -138,7 +138,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
     AbsReference lockedGetOrLoad(CacheDefiniens definiens, int hash) {
         HashEntry e;
-        AbsReference value;
+        AbsReference ref;
 
         final String key = definiens.getKey();
         lock();
@@ -155,11 +155,11 @@ final class Segment extends ReentrantLock implements Serializable {
             for (e = first; e != null; e = e.getNext()) {
                 String entryKey = e.getKey();
                 if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
-                    value = e.getQueueEntry();
+                    ref = e.getQueueEntry();
 
-                    if (value != null && !(isExpired(e, now) && !value.isAllPersist())) {
+                    if (ref != null && !(isExpired(e, now) && !ref.isAllPersist())) {
                         recordAccess(e);
-                        return value;
+                        return ref;
                     }
 
                     // immediately reuse invalid entries
@@ -170,10 +170,12 @@ final class Segment extends ReentrantLock implements Serializable {
             }
 
             // 获取且保存
-            value = definiens.load();
-            put(key, hash, value, false);
-
-            return value;
+            ref = definiens.load();
+            // 放入缓存
+            put(key, hash, ref, false);
+            definiens.afterLoad(ref);
+            // 加载完之后调用
+            return ref;
         } finally {
             unlock();
         }
@@ -189,14 +191,13 @@ final class Segment extends ReentrantLock implements Serializable {
 
             // todo refresh前是否需要把缓存从persistQueue删除？
             // 获取且保存
-            StopWatch watch = new Slf4JStopWatch();
-            AbsReference value = definiens.load();
-            watch.stop("cache.loadFromDB()");
-
+            AbsReference ref = definiens.load();
             // 放入缓存
-            put(key, hash, value, false);
+            put(key, hash, ref, false);
+            // 加载完之后调用
+            definiens.afterLoad(ref);
 
-            return value;
+            return ref;
         } finally {
             unlock();
         }

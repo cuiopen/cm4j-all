@@ -37,6 +37,14 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 	 */
 	public abstract V load();
 
+    /**
+     * 在load之后调用
+     * 子类可覆盖，用于没有则创建的业务
+     *
+     * @param ref
+     */
+    public void afterLoad(V ref){};
+
 	public String getKey() {
 		return this.key;
 	}
