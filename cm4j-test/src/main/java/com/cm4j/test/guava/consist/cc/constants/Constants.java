@@ -12,7 +12,8 @@ public class Constants {
     // 默认segment的个数
     // 注意：极限情况16个segment同时写入数据，则会占用16个线程池资源
     // 这时线程池配置要大于此数值，否则可能出现线程池资源耗尽导致程序全部锁定
-    public static final int DEFAULT_CONCURRENCY_LEVEL = 4;
+    // TODO 测试用，正式改为4
+    public static final int DEFAULT_CONCURRENCY_LEVEL = 1;
     public static final int MAXIMUM_CAPACITY = 1 << 30;
     public static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
     public static final int RETRIES_BEFORE_LOCK = 2;

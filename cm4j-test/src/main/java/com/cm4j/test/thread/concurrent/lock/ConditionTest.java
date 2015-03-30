@@ -33,7 +33,6 @@ public class ConditionTest {
 	public void get() throws InterruptedException {
 		try {
 			lock.lock();
-			lock.lock();
 			if (storage <= 0) {
 				getCondition.await();
 			}
@@ -41,7 +40,6 @@ public class ConditionTest {
 			System.out.println("get  => " + ++getCounter);
 			putCondition.signal();
 		} finally {
-			lock.unlock();
 			lock.unlock();
 		}
 	}

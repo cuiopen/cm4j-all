@@ -131,6 +131,7 @@ public class ConcurrentCache {
      * @param definiens
      * @return
      */
+    @Deprecated
     @SuppressWarnings("unchecked")
     public <V extends AbsReference> V refresh(CacheDefiniens<V> definiens) {
         int hash = CCUtils.rehash(definiens.getKey().hashCode());
@@ -310,6 +311,7 @@ public class ConcurrentCache {
         boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Boolean>() {
             @Override
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
+                // 没过期或者没没全保存??
                 if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
                     // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
                     if (entry.getIsChanged().get()) {
@@ -319,8 +321,12 @@ public class ConcurrentCache {
                         return true;
                     }
                 }
+                // TODO 临时禁用，正常要使用throw来警告
+                // 过期了 或者 全保存了会走到这里
+                // 如果persistAndRemove，则persitQueue则持久化该状态则可能走到这里
+                return true;
                 // 不存在或过期
-                throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
+//                throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
             }
         });
         return result;
@@ -415,7 +421,7 @@ public class ConcurrentCache {
      */
     public void stop() {
         logger.error("stop()启动，缓存被关闭，等待写入线程完成...");
-        Stopwatch watch = new Stopwatch().start();
+        Stopwatch watch = Stopwatch.createStarted();
         stop.set(true);
 
         for (final Segment segment : segments) {
@@ -438,6 +444,6 @@ public class ConcurrentCache {
         }
 
         watch.stop();
-        logger.error("stop()运行时间:{}ms", watch.elapsedMillis());
+        logger.error("stop()运行时间:{}ms", watch.elapsed(TimeUnit.MILLISECONDS));
     }
 }

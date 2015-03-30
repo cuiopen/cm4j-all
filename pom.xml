@@ -27,7 +27,7 @@
 		<hamcrest.version>1.1</hamcrest.version>
 		<netty.version>3.2.7.Final</netty.version>
 		<freemarker.version>2.3.20</freemarker.version>
-		<google.guava.version>13.0</google.guava.version>
+		<google.guava.version>17.0</google.guava.version>
 		<quartz.version>2.0.2</quartz.version>
 		<joda-time.version>2.0</joda-time.version>
 		<ehcache.version>2.5.1</ehcache.version>
@@ -36,6 +36,8 @@
 		<deepcopy.version>1.5</deepcopy.version>
 		<kryo.version>2.16</kryo.version>
 		<deepcopy.version>1.5</deepcopy.version>
+        <groovy.version>2.4.0-beta-2</groovy.version>
+        <http-builder.version>0.7</http-builder.version>
 		<!-- 数据库 -->
 		<h2database.version>1.2.135</h2database.version>
 		<hibernate.version>3.3.1.ga</hibernate.version><!-- 3.3.1.ga,4.1.0.Final -->
@@ -127,7 +129,7 @@
 	<!-- 预定义依赖项 -->
 	<dependencyManagement>
 		<dependencies>
-			<!-- apache commons begin -->
+            <!-- apache commons begin -->
 			<dependency>
 				<groupId>commons-lang</groupId>
 				<artifactId>commons-lang</artifactId>
@@ -163,6 +165,18 @@
 				<artifactId>joda-time</artifactId>
 				<version>${joda-time.version}</version>
 			</dependency>
+
+            <!--groovy-->
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy</artifactId>
+                <version>${groovy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy.modules.http-builder</groupId>
+                <artifactId>http-builder</artifactId>
+                <version>${http-builder.version}</version>
+            </dependency>
 
 			<!-- spring begin -->
 			<dependency>
@@ -531,8 +545,8 @@
 						</dependency>
 					</dependencies>
 					<configuration>
-						<source>1.6</source>
-						<target>1.6</target>
+						<source>1.8</source>
+						<target>1.8</target>
 						<encoding>${project.build.sourceEncoding}</encoding>
 					</configuration>
 				</plugin>

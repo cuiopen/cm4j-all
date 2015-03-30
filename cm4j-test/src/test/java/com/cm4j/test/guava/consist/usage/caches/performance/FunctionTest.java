@@ -31,7 +31,7 @@ public class FunctionTest {
 
 	@Test
 	public void funcTest() throws InterruptedException, BrokenBarrierException {
-		int num = 5;
+		int num = 1;
 		CyclicBarrier barrier = new CyclicBarrier(num + 1);
 		AtomicLong counter = new AtomicLong();
 		for (int i = 0; i < num; i++) {
@@ -46,7 +46,7 @@ public class FunctionTest {
 
 		long writeEnd = System.nanoTime();
 
-		System.out.println("======================");
+        System.out.println("======================");
 		System.out.println("完成，数值sum为：" + counter.get());
 		System.out.println("计算消耗时间：" + (double) (end - start) / 1000000000);
 		System.out.println("写入消耗时间：" + (double) (writeEnd - end) / 1000000000);
@@ -65,7 +65,7 @@ public class FunctionTest {
 		public void run() {
 			try {
 				barrier.await();
-				for (int i = 0; i < 200000; i++) { // 执行20000次
+				for (int i = 0; i < 1000; i++) { // 执行20000次
 					try {
 						int random = RandomUtils.nextInt(1000);
 
@@ -76,16 +76,18 @@ public class FunctionTest {
                                 ref.update(new TmpFhhd(random, 1, 1, ""));
 
                                 // 直接persist需注释
-                                // ref.persistAndRemove();
+//                                ref.persistAndRemove();
 //                                ref.persist();
 
                                 // 计数器放在最下面，保证上面执行成功后再计数
                                 counter.incrementAndGet();
                             } else {
 								double d = RandomUtils.nextDouble();
-								if (d >= 0.2) { // >=0 一定成立，则无删除
+								if (d >= 0) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
+
+                                    ref.persistAndRemove();;
 
                                     counter.incrementAndGet();
                                 } else if (d >= 0) {

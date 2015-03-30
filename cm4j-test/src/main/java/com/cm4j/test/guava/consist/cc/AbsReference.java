@@ -155,14 +155,17 @@ public abstract class AbsReference {
     protected void persistDeleteSet() {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         // deleteSet数据处理
-        for (CacheEntry v : getDeletedSet()) {
+        Iterator<CacheEntry> iter = getDeletedSet().iterator();
+
+        while (iter.hasNext()) {
+            CacheEntry v = iter.next();
             hibernate.delete(v);
-            changeDbState(v, DBState.P);
-            // 占位：发送到更新队列，状态P
-            // ConcurrentCache.getInstance().sendToPersistQueue(v);
             // 从保存队列里面移除
             ConcurrentCache.getInstance().removeFromPersistQueue(v);
+            // 不需要更改缓存状态，因为下面会把deleteSet整个删除
+//            changeDbState(v, DBState.P);
         }
+
         getDeletedSet().clear();
     }
 

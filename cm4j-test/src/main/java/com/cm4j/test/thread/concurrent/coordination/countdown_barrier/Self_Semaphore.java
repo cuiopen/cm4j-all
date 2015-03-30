@@ -8,8 +8,6 @@ public class Self_Semaphore {
 
 	private class Sync extends AbstractQueuedSynchronizer {
 
-		private static final long serialVersionUID = 1L;
-
 		private int permits;
 
 		public Sync(int permits) {
@@ -19,11 +17,11 @@ public class Self_Semaphore {
 
 		@Override
 		protected int tryAcquireShared(int arg) {
-			int state = getState();
-			int next = state - 1;
 			for (;;) {
-				if (next < 0 || compareAndSetState(state, next)) {
-					return next;
+                int state = getState();
+                int next = state - 1;
+                if (next < 0 || compareAndSetState(state, next)) {
+                    return next;
 				}
 			}
 		}
@@ -33,11 +31,9 @@ public class Self_Semaphore {
 			int state = getState();
 			int next = state + 1;
 			if (next <= permits) {
-				if (compareAndSetState(state, next)) {
-					return true;
-				} 
-			}
-			return false;
+                return compareAndSetState(state, next);
+            }
+            return false;
 		}
 	}
 
@@ -96,9 +92,11 @@ public class Self_Semaphore {
 	public static void main(String[] args) {
 		Self_Semaphore use = new Self_Semaphore(3);
 		SendingThread sendingThread = use.new SendingThread(use);
+		SendingThread sendingThread1 = use.new SendingThread(use);
 		ReceivingThread receivingThread = use.new ReceivingThread(use);
 
 		sendingThread.start();
+		sendingThread1.start();
 		receivingThread.start();
 	}
 

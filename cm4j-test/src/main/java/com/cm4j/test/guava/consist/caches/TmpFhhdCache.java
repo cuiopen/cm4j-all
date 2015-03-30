@@ -22,14 +22,14 @@ public class TmpFhhdCache extends CacheDefiniens<SingleReference<TmpFhhd>> {
         return new SingleReference<TmpFhhd>(hibernate.findById(playerId));
 	}
 
-    @Override
-    public void afterLoad(SingleReference<TmpFhhd> ref) {
-        if (ref.get() == null) {
-            TmpFhhd fhhd = new TmpFhhd();
-            fhhd.setNPlayerId(playerId);
-            fhhd.setNCurToken(200);
-
-            ref.update(fhhd);
-        }
-    }
+//    @Override
+//    public void afterLoad(SingleReference<TmpFhhd> ref) {
+//        if (ref.get() == null) {
+//            TmpFhhd fhhd = new TmpFhhd();
+//            fhhd.setNPlayerId(playerId);
+//            fhhd.setNCurToken(0);
+//
+//            ref.update(fhhd);
+//        }
+//    }
 }

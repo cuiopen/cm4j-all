@@ -181,6 +181,14 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    /**
+     * 未经过测试
+     *
+     * @param definiens
+     * @param hash
+     * @return
+     */
+    @Deprecated
     AbsReference refresh(CacheDefiniens definiens, int hash) {
         final String key = definiens.getKey();
         lock();

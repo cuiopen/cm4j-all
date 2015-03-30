@@ -25,11 +25,14 @@ public class ReadWriteLockDemo {
 
 	public static void main(String[] args) {
 		Data data = new Data();
-		// 这里是控制读写的 true or false
-		Worker t1 = new Worker(data, false);
-		Worker t2 = new Worker(data, false);
+		// 写
+        Worker t1 = new Worker(data, false);
+        // 读
+        Worker t2 = new Worker(data, true);
+		Worker t3 = new Worker(data, true);
 		t1.start();
 		t2.start();
+		t3.start();
 	}
 
 	static class Worker extends Thread {
