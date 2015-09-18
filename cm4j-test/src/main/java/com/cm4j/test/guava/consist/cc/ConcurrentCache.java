@@ -248,7 +248,7 @@ public class ConcurrentCache {
     }
 
     public void persist() {
-        // TODO 立即保存所有对象 待实现
+        // TODO 立即保存所有对象待实现
         throw new RuntimeException("not implemented");
     }
 
