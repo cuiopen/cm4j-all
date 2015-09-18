@@ -30,6 +30,12 @@ import java.util.concurrent.atomic.AtomicLong;
 @ContextConfiguration(locations = {"classpath*:test_1/spring-ds.xml"})
 public class FunctionTest {
 
+    public static void main(String[] args) {
+        for (int j = 0; j < 300; j++) {
+            System.out.println("INSERT INTO `tmp_fhhd` VALUES(" + j + ",1,1,'');");
+        }
+    }
+
     public final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final Object lock = new Object();
