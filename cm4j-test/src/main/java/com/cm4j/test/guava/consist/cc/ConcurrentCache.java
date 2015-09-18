@@ -11,6 +11,7 @@ import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -359,10 +360,9 @@ public class ConcurrentCache {
         segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
     }
 
-    void sendToPersistQueueAndPersist(CacheEntry entry) {
-        String key = entry.ref().getAttachedKey();
+    void persistImmediately(String key, Collection<CacheEntry> del, Collection<CacheEntry> up) {
         int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).getPersistQueue().persistImmediately(entry);
+        segmentFor(hash).getPersistQueue().persistImmediately(del,up);
     }
 
     // 缓存关闭标识

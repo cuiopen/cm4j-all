@@ -248,10 +248,8 @@ final class Segment extends ReentrantLock implements Serializable {
             if (e != null) {
                 AbsReference ref = e.getQueueEntry();
                 if (ref != null && !ref.isAllPersist()) {
-                    // deleteSet数据保存
-                    ref.persistDeleteSet();
-                    // 非deleteSet数据保存
-                    ref.persistNotDeleteSet();
+                    // 数据保存
+                    ref.persistImmediately();
                 }
                 if (isRemove) {
                     // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update

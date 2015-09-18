@@ -12,10 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 
 import javax.validation.ConstraintViolationException;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -55,19 +52,25 @@ public class DBPersistQueue {
         map.put(entry.getID(), entry);
     }
 
-    public void persistImmediately(CacheEntry entry) {
-        // 重置persist信息
-        entry.mirror();
-        String key = entry.getID();
+    public void persistImmediately(Collection<CacheEntry> del, Collection<CacheEntry> up) {
+        HashSet<CacheEntry> all = Sets.newHashSet();
+        all.addAll(del);
+        all.addAll(up);
+
+        for (CacheEntry e : all) {
+            e.mirror();
+        }
 
         writeLock.lock();
         try {
-            // 先从持久化map移除
-            map.remove(key);
-            // 持久化操作
-            if (entry != null) {
-                persist(entry);
+            for (CacheEntry e : all) {
+                // 重置persist信息
+                String key = e.getID();
+                map.remove(key);
             }
+
+            batchPersistData(del);
+            batchPersistData(up);
         } finally {
             writeLock.unlock();
         }
