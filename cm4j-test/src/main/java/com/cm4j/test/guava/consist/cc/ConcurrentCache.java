@@ -11,6 +11,7 @@ import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -270,10 +271,6 @@ public class ConcurrentCache {
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
                 // 没过期或者没没全保存??
                 if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
-                    // recheck，不等于0代表有其他线程修改了，所以不能改为P状态
-                    if (entry.getIsChanged().get()) {
-                        return false;
-                    }
                     if (e.getQueueEntry().changeDbState(entry, DBState.P)) {
                         return true;
                     }
@@ -359,10 +356,9 @@ public class ConcurrentCache {
         segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
     }
 
-    void sendToPersistQueueAndPersist(CacheEntry entry) {
-        String key = entry.ref().getAttachedKey();
+    void persistImmediately(String key, Collection<CacheEntry> del, Collection<CacheEntry> up) {
         int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).getPersistQueue().persistImmediately(entry);
+        segmentFor(hash).getPersistQueue().persistImmediately(del,up);
     }
 
     // 缓存关闭标识

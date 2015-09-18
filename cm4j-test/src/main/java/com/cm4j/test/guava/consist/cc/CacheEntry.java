@@ -22,11 +22,6 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 * 缓存状态 - 默认持久化
 	 */
 	private volatile DBState dbState = DBState.P;
-	/**
-	 * 放到persist队列则设置为true，每次迭代到则设为false
-     * 修改完成时，检测是否是false，如果不是，则代表有其他线程修改了，这时不能设置DBState为P
-	 */
-	private final AtomicBoolean isChanged = new AtomicBoolean(false);
 
     private IEntity mirrorEntity;
     private DBState mirrorDBState;
@@ -44,8 +39,6 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
      * 需要把当前状态和数据做一个镜像备份，保存db时就用备份数据，这样不会出现当前数据更改了，影响到保存DB的数据
      */
     public void mirror() {
-        getIsChanged().set(true);
-
         IEntity parseEntity = this.parseEntity();
         if (this instanceof IEntity && (this != parseEntity)) {
             // 内存地址不同，创建了新对象
@@ -133,10 +126,6 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 
 	synchronized void setDbState(DBState dbState) {
 		this.dbState = dbState;
-	}
-
-	AtomicBoolean getIsChanged() {
-		return isChanged;
 	}
 
 	public AbsReference ref() {

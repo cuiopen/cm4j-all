@@ -6,7 +6,7 @@ import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -37,8 +37,16 @@ public class FunctionTest {
     @Test
     public void test() {
         HibernateDao hibernateDao = ServiceManager.getInstance().getSpringBean("hibernateDao");
-        TmpFhhd tmpFhhd = new TmpFhhd(1, 1, 1, "");
-        hibernateDao.saveOrUpdateAll(new ArrayList(ImmutableList.of(tmpFhhd, tmpFhhd)));
+
+        logger.error("started....");
+        ArrayList<Object> list = Lists.newArrayList();
+        for (int i = 0; i < 300; i++) {
+            TmpFhhd tmpFhhd = new TmpFhhd(i, 1, 1, "");
+            list.add(tmpFhhd);
+//            hibernateDao.saveOrUpdate(tmpFhhd);
+        }
+        hibernateDao.saveOrUpdateAll(list);
+        logger.error("end ....");
     }
 
     @Test
@@ -80,7 +88,7 @@ public class FunctionTest {
                 for (int i = 0; i < 2000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
-                        int random = RandomUtils.nextInt(1000);
+                        int random = RandomUtils.nextInt(500);
 
                         synchronized (lock) {
                             // 这一段要放在锁内，否则多线程获取ref，另一个线程remove缓存，则当前线程的ref就过期了。

@@ -1,11 +1,11 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
-import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -123,40 +123,26 @@ public abstract class AbsReference {
      * 非deleteSet数据保存，deleteSet中数据在persistAndRemove()已经处理了<br />
      * <font color="red">此方法在lock下被调用</font>
      */
-    protected void persistNotDeleteSet(){
-        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+    protected void persistImmediately(){
 
+
+        // 需要删除数据
+        Set<CacheEntry> deletedSet = getDeletedSet();
+        Set<CacheEntry> delSet = Sets.newHashSet(deletedSet);
+        deletedSet.clear();
+
+        ArrayList<CacheEntry> up = Lists.newArrayList();
+        // 正常数据
         for (CacheEntry entry : getNotDeletedSet()) {
             // 从persistQueue移除[不管状态是什么，都要移除]
             // 注意：要先移除，再做持久化。因为persistQueue也会持久化数据
 
             if (DBState.P != entry.getDbState()) {
-                IEntity entity = entry.parseEntity();
-                /*if (DBState.U == entry.getDbState()) {
-                    hibernate.saveOrUpdate(entity);
-                } else if (DBState.D == entry.getDbState()) {
-                    hibernate.delete(entity);
-                }
-                entry.setDbState(DBState.P);*/
-                ConcurrentCache.getInstance().sendToPersistQueueAndPersist(entry);
+                up.add(entry);
             }
         }
-    }
 
-    /**
-     * 将deleteSet中的对象持久化
-     */
-    protected void persistDeleteSet() {
-        // deleteSet数据处理
-        Set<CacheEntry> deletedSet = getDeletedSet();
-        Iterator<CacheEntry> iter = deletedSet.iterator();
-
-        while (iter.hasNext()) {
-            CacheEntry v = iter.next();
-            ConcurrentCache.getInstance().sendToPersistQueueAndPersist(v);
-        }
-
-        deletedSet.clear();
+        ConcurrentCache.getInstance().persistImmediately(getAttachedKey(), delSet, up);
     }
 
     /**
