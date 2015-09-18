@@ -158,6 +158,6 @@ public class FIFOAccessQueue<E extends IQueueEntry> extends AbstractQueue<E> {
 
         queue.offer(b);
 
-        System.out.println(queue.remove(d));;
+        System.out.println(queue.remove(d));
     }
 }

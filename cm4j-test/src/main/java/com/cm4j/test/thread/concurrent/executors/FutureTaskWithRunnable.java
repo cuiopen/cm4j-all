@@ -23,8 +23,7 @@ public class FutureTaskWithRunnable {
 		// 2.根据Callable获取FutureTask
 		FutureTask<Integer> futureTask = new FutureTask<Integer>(callable);
 		// 3.根据FutureTask获取Thread并执行
-		Thread newThread = new Thread(futureTask);
-		newThread.start();
+		new Thread(futureTask).start();
 		// 4.从futureTask获取值
 		System.out.println(futureTask.get(1000, TimeUnit.MILLISECONDS));
 	}

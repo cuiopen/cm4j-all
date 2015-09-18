@@ -3,12 +3,9 @@ package com.cm4j.test.guava.consist.cc;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.consist.fifo.FIFOEntry;
-import com.cm4j.test.guava.consist.keys.Identity;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import org.springframework.beans.BeanUtils;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -109,33 +106,21 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 * 
 	 * @return
 	 */
-	protected Object getIdentity() {
+	protected String dbUniqueKey() {
 		return null;
 	}
 
 	/**
-	 * 唯一标识的数值 1.子类覆写 {@link #getIdentity()} 2.子类实现标识注解ID在字段上
+	 * 唯一标识的数值 1.子类覆写 {@link #dbUniqueKey()} 2.子类实现标识注解ID在字段上
 	 */
-	public Object getID() {
-		Object result = getIdentity();
-		if (result != null) {
-			return result;
+	public String getID() {
+		String entryKey = dbUniqueKey();
+		if (entryKey != null) {
+			return ref().getAttachedKey() + "`" + entryKey;
 		}
-		Method[] methods = this.getClass().getDeclaredMethods();
-		for (Method method : methods) {
-			if (method.isAnnotationPresent(Identity.class)) {
-				try {
-					result = method.invoke(this);
-					if (result != null) {
-						return result;
-					}
-				} catch (Exception e) {
-					// 获取CacheEntry.ID异常
-					Throwables.propagate(e);
-				}
-			}
-		}
-		throw new RuntimeException("CacheEntry的标识不能为空");
+
+		// todo 如果为空，可用反射获取主键ID
+        throw new RuntimeException("CacheEntry的标识不能为空");
 	}
 
 	/*

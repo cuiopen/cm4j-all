@@ -11,7 +11,7 @@
 		<!-- 依赖库版本号定义 -->
 		<!-- 日志部分 -->
 		<slf4j.version>1.6.0</slf4j.version>
-		<logback.version>0.9.24</logback.version>
+		<logback.version>1.1.2</logback.version>
 		<perf4j.version>0.9.16</perf4j.version>
 		<!-- 工具库 -->
 		<commons-lang.version>2.5</commons-lang.version>

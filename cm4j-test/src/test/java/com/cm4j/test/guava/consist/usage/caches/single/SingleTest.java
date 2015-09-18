@@ -76,14 +76,6 @@ public class SingleTest {
     }
 
     @Test
-    public void refreshTest() {
-        TmpFhhd fhhd = ConcurrentCache.getInstance().get(new TmpFhhdCache(50769)).get();
-        TmpFhhd fhhd2 = new TmpFhhdCache(50769).refresh().get();
-
-        Assert.assertTrue(fhhd != fhhd2);
-    }
-
-    @Test
     public void persistAndRemove() {
         TmpFhhd fhhd = new TmpFhhdCache(50769).ref().get();
         fhhd.setNCurToken(1);

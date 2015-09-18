@@ -1,13 +1,8 @@
 package com.cm4j.test.guava.base;
 
-import com.google.common.base.CharMatcher;
-import com.google.common.collect.AbstractIterator;
-
-import java.util.Iterator;
-
 public final class Splitter {
 
-    private final CharMatcher trimmer;
+    /*private final CharMatcher trimmer;
     private final boolean omitEmptyStrings;
     private final Strategy strategy;
     private final int limit;
@@ -121,5 +116,5 @@ public final class Splitter {
     public static void main(String[] args) {
         Iterable<String> split = Splitter.on(CharMatcher.DIGIT).split("a1b2c3");
         split.forEach(System.out::println);
-    }
+    }*/
 }

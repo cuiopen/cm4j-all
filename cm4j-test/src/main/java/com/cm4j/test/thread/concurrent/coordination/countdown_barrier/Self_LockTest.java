@@ -29,7 +29,7 @@ public class Self_LockTest {
     }
 
     public static void main(String[] args) {
-        Lock lock = new Lock();
+        final Lock lock = new Lock();
         
         new Thread(){
         	public void run() {

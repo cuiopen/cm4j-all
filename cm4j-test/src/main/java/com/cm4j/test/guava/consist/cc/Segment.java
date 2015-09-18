@@ -4,16 +4,12 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -181,36 +177,6 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
-    /**
-     * 未经过测试
-     *
-     * @param definiens
-     * @param hash
-     * @return
-     */
-    @Deprecated
-    AbsReference refresh(CacheDefiniens definiens, int hash) {
-        final String key = definiens.getKey();
-        lock();
-        try {
-            // re-read ticker once inside the lock
-            long now = CCUtils.now();
-            preWriteCleanup(now);
-
-            // todo refresh前是否需要把缓存从persistQueue删除？
-            // 获取且保存
-            AbsReference ref = definiens.load();
-            // 放入缓存
-            put(key, hash, ref, false);
-            // 加载完之后调用
-            definiens.afterLoad(ref);
-
-            return ref;
-        } finally {
-            unlock();
-        }
-    }
-
     boolean containsKey(String key, int hash) {
         if (count != 0) { // read-volatile
             long now = CCUtils.now();
@@ -274,35 +240,24 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
-    /**
-     * Remove; match on key only if value null, else match both.
-     * 注意：在functionTest测试有数值对不上
-     */
-    @Deprecated
-    AbsReference remove(String key, int hash, AbsReference value) {
+    void persistAndRemove(String key, int hash ,boolean isRemove) {
         lock();
         try {
-            preWriteCleanup(CCUtils.now());
-
             HashEntry e = getEntry(key, hash);
-            AbsReference oldValue = null;
+
             if (e != null) {
-                AbsReference v = e.getQueueEntry();
-                if (value == null || value.equals(v)) {
-                    oldValue = v;
-
-                    // TODO 把缓存从persistQueue移除
-                    HashSet<CacheEntry> result = Sets.newHashSet(v.getDeletedSet());
-                    result.addAll(v.getNotDeletedSet());
-
-                    for (CacheEntry entry : result) {
-                        getPersistQueue().removeFromPersistQueue(entry);
-                    }
-
-                    removeEntry(e, e.getHash());
+                AbsReference ref = e.getQueueEntry();
+                if (ref != null && !ref.isAllPersist()) {
+                    // deleteSet数据保存
+                    ref.persistDeleteSet();
+                    // 非deleteSet数据保存
+                    ref.persistNotDeleteSet();
+                }
+                if (isRemove) {
+                    // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
+                    removeEntry(e, hash);
                 }
             }
-            return oldValue;
         } finally {
             unlock();
         }
@@ -321,7 +276,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 count = 0; // write-volatile
 
                 // todo 是否该放到这里??? 清除PersistQueue
-                getPersistQueue().getQueue().clear();
+                getPersistQueue().getMap().clear();
             } finally {
                 unlock();
             }
@@ -454,7 +409,8 @@ final class Segment extends ReentrantLock implements Serializable {
                 tab.set(index, newFirst);
                 count = c; // write-volatile
 
-                logger.warn("缓存[{}]被移除", entry.getKey());
+                logger.warn("缓存[{}-{}]被移除",
+                        new Object[]{entry.getKey(), entry.getQueueEntry()});
                 return;
             }
         }
@@ -533,7 +489,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
     // 缓存读取，写入的对象都需要放入recencyQueue
     // 为什么要有recencyQueue？
-    // 因为accessQueue是非线程安全的，如果直接在recordAccess()里面调用accessQueue，则线程不安全
+    // 因为accessQueue是非线程安全的，如果直接在recordAccess()[可能多线程调用]里面调用accessQueue，则线程不安全
     // 因此增加一个线程安全的recencyQueue来保证线程的安全性，
     final Queue<HashEntry> recencyQueue = new ConcurrentLinkedQueue<HashEntry>();
 
@@ -570,22 +526,6 @@ final class Segment extends ReentrantLock implements Serializable {
 
     public DBPersistQueue getPersistQueue() {
         return persistQueue;
-    }
-
-    // 加锁，一次从里面获取size个数据
-    public List<CacheEntry> drainUnderLock(int size) {
-        List<CacheEntry> result = Lists.newArrayList();
-        lock();
-        try {
-            int counter = 0;
-            CacheEntry e;
-            while (counter++ < size && (e = persistQueue.getQueue().poll()) != null) {
-                result.add(e);
-            }
-            return result;
-        } finally {
-            unlock();
-        }
     }
 
     // ----------------------- lock handler -----------------------

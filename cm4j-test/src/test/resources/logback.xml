@@ -60,7 +60,7 @@
 	</appender>
 	<!--获取所有的StopWatch 信息并处理 -->
 	<appender name="perf4j"
-		class="com.cm4j.test.slf4j.Slf4JAsyncCoalescingStatisticsAppender">
+		class="org.perf4j.logback.AsyncCoalescingStatisticsAppender">
 		<!--时间间隔 -->
 		<param name="timeSlice" value="5000" />
 		<appender-ref ref="perf4jFile" />

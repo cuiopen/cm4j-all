@@ -124,20 +124,6 @@ public class ConcurrentCache {
         return (V) segmentFor(hash).get(definiens, hash, false);
     }
 
-    /**
-     * 重新从db加载数据
-     *
-     * @param <V>
-     * @param definiens
-     * @return
-     */
-    @Deprecated
-    @SuppressWarnings("unchecked")
-    public <V extends AbsReference> V refresh(CacheDefiniens<V> definiens) {
-        int hash = CCUtils.rehash(definiens.getKey().hashCode());
-        return (V) segmentFor(hash).refresh(definiens, hash);
-    }
-
     @SuppressWarnings("unchecked")
     public <V extends AbsReference> V put(CacheDefiniens<V> desc, AbsReference value) {
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
@@ -182,36 +168,7 @@ public class ConcurrentCache {
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
         final int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Void>() {
-            @Override
-            public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getQueueEntry() != null) {
-                    if (!e.getQueueEntry().isAllPersist()) {
-                        // deleteSet数据保存
-                        e.getQueueEntry().persistDeleteSet();
-                        // 非deleteSet数据保存
-                        e.getQueueEntry().persistNotDeleteSet();
-                    }
-                    if (isRemove) {
-                        // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
-                        segment.removeEntry(e, hash);
-                    }
-                }
-                return null;
-            }
-        });
-    }
-
-    public AbsReference remove(String key) {
-        int hash = CCUtils.rehash(key.hashCode());
-        return segmentFor(hash).remove(key, hash, null);
-    }
-
-    public boolean remove(String key, AbsReference value) {
-        int hash = CCUtils.rehash(key.hashCode());
-        if (value == null)
-            return false;
-        return segmentFor(hash).remove(key, hash, value) != null;
+        segmentFor(hash).persistAndRemove(key, hash, isRemove);
     }
 
     public void clear() {
@@ -402,15 +359,10 @@ public class ConcurrentCache {
         segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
     }
 
-    /**
-     * 从persistQueue移除
-     *
-     * @param entry
-     */
-    void removeFromPersistQueue(CacheEntry entry) {
+    void sendToPersistQueueAndPersist(CacheEntry entry) {
         String key = entry.ref().getAttachedKey();
         int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).getPersistQueue().removeFromPersistQueue(entry);
+        segmentFor(hash).getPersistQueue().persistImmediately(entry);
     }
 
     // 缓存关闭标识

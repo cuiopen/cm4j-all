@@ -73,7 +73,12 @@ public class TmpFhhd extends CacheEntry implements IEntity, Cloneable {
 		this.SRewards = SRewards;
 	}
 
-	@Override
+    @Override
+    protected String dbUniqueKey() {
+        return String.valueOf(getNPlayerId());
+    }
+
+    @Override
 	public IEntity parseEntity() {
 		try {
 			return (IEntity) this.clone();

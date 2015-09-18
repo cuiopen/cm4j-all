@@ -4,18 +4,21 @@ import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
-import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.service.ServiceManager;
 import com.google.common.collect.Lists;
-import org.hibernate.HibernateException;
-import org.hibernate.NonUniqueObjectException;
-import org.hibernate.Session;
-import org.hibernate.Transaction;
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 
+import javax.validation.ConstraintViolationException;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by yanghao on 14-4-1.
@@ -23,9 +26,13 @@ import java.util.List;
 public class DBPersistQueue {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final FIFOAccessQueue<CacheEntry> queue;
+
+    private final HibernateDao hibernate;
     private final Segment segment;
 
+    private final ConcurrentHashMap<String, CacheEntry> map;
+    // 写入锁
+    private final Lock writeLock = new ReentrantLock();
     /**
      * 更新队列消费计数器
      */
@@ -33,7 +40,8 @@ public class DBPersistQueue {
 
     public DBPersistQueue(Segment segment) {
         this.segment = segment;
-        this.queue = new FIFOAccessQueue<CacheEntry>();
+        map = new ConcurrentHashMap<>();
+        hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
     }
 
     /**
@@ -42,31 +50,81 @@ public class DBPersistQueue {
      * @param entry
      */
     public void sendToPersistQueue(CacheEntry entry) {
-        // TODO 这里是个瓶颈，从queue移除是一个个遍历移除的，如果数据量很大，则会拖慢速度
-        // 之前采用只加入不移除，则出现遍历队列太慢的问题
-        // 现在改成移除再加入，则出现remove慢的问题
-        // 保留：1w/s 如果下面注释，则5w/s
-
-        // 最好是提供一个自动加入到队列尾部的高并发队列 [待扩展]
-
-//        // 先从队列删除
-//        queue.remove(entry);
-//        // 重置persist信息
-//        entry.mirror();
-//        // 加入到队列尾部
-//        queue.add(entry);
-
-
-        // 这里是否要先从persistQueue remove再offer ？
-        // 应该不用，这里是在锁下面执行的
-
         // 重置persist信息
         entry.mirror();
-        queue.offer(entry);
+        map.put(entry.getID(), entry);
     }
 
-    public void removeFromPersistQueue(CacheEntry entry) {
-        queue.remove(entry);
+    public void persistImmediately(CacheEntry entry) {
+        // 重置persist信息
+        entry.mirror();
+        String key = entry.getID();
+
+        writeLock.lock();
+        try {
+            // 先从持久化map移除
+            map.remove(key);
+            // 持久化操作
+            if (entry != null) {
+                persist(entry);
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    /**
+     * 获取N个对象
+     *
+     * @param size
+     * @return
+     */
+    public Set<CacheEntry> drain(int size) {
+        Enumeration<String> keys = map.keys();
+        int i = 0;
+        Set result = Sets.newHashSet();
+        while (keys.hasMoreElements() && i++ < size) {
+            String key = keys.nextElement();
+            CacheEntry value = map.remove(key);
+            if (value != null) {
+                result.add(value);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 专门给persistAndRemove方法调用的立即持久化
+     *
+     * @param entry
+     */
+    private void persist(CacheEntry entry) {
+        entry.getIsChanged().set(true);
+
+        // 删除或者更新的num为0
+        IEntity entity = entry.mirrorEntity();
+        if (entity != null && DBState.P != entry.mirrorDBState()) {
+            try {
+                DBState dbState = entry.mirrorDBState();
+                IEntity e = entry.mirrorEntity();
+                if (DBState.U == dbState) {
+                    // 这里报DataIntegrityViolationException
+                    // 原因请看下面的
+
+                    hibernate.saveOrUpdate(e);
+                } else if (DBState.D == dbState) {
+                    hibernate.delete(e);
+                }
+            } catch (DataAccessException e1) {
+                logger.error("", e1);
+            }
+
+            // todo 正常定时持久化  应该是这里设置状态，放外面有没有问题？待测
+            // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
+            // ConcurrentCache.getInstance().changeDbStatePersist(entry);
+        }
+
     }
 
     /**
@@ -83,47 +141,59 @@ public class DBPersistQueue {
         int persistNum = 0;
 
         long currentCounter = counter++;
-        int queueSize = queue.size();
+        int queueSize = map.size();
         logger.error(this.segment + ":定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queueSize, doNow});
         if (doNow || queueSize >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (currentCounter) % Constants.PERSIST_CHECK_INTERVAL == 0) {
 
             List<CacheEntry> toBatch = Lists.newArrayList();
 
-            List<CacheEntry> entries;
+            Set<CacheEntry> entries;
             while (true) {
-                entries = this.segment.drainUnderLock(Constants.BATCH_TO_COMMIT);
+                writeLock.lock();
+
+                entries = drain(Constants.BATCH_TO_COMMIT);
                 if (entries.size() == 0) {
                     logger.error(this.segment + ":定时[{}]检测结束，queue内无数据", currentCounter);
                     break;
                 }
 
-                logger.debug(this.segment + ":缓存存储数据开始");
+                logger.debug(this.segment + ":缓存存储数据开始，size：" + map.size());
 
-                for (CacheEntry wrapper : entries) {
-                    wrapper.getIsChanged().set(true);
+                try {
+                    for (CacheEntry wrapper : entries) {
+                        wrapper.getIsChanged().set(true);
 
-                    // 删除或者更新的num为0
-                    IEntity entity = wrapper.mirrorEntity();
-                    if (entity != null && DBState.P != wrapper.mirrorDBState()) {
-                        toBatch.add(wrapper);
+                        // 删除或者更新的num为0
+                        IEntity entity = wrapper.mirrorEntity();
+                        if (entity != null && DBState.P != wrapper.mirrorDBState()) {
+                            toBatch.add(wrapper);
+                        }
+                    }
+
+                    if (toBatch.size() > 0) {
+                        try {
+                            logger.debug(this.segment + ":批处理大小：{}", toBatch.size());
+                            persistNum += toBatch.size();
+                            batchPersistData(toBatch);
+                        } catch (Exception e) {
+                            logger.error(this.segment + ":缓存批处理异常", e);
+                        }
+                    }
+                } finally {
+                    writeLock.unlock();
+                }
+
+                if (toBatch.size() > 0) {
+                    for (CacheEntry wrapper : toBatch) {
+                        // 注意：这里不要放到lock内
+                        // 因为改状态是要锁定segment的，放到lock内，则出现大锁套小锁，有概率会导致死锁
+                        // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
+                        ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
                     }
                 }
 
-                // 条件：在toBatch大于0的情况下 (或关系)：
-                // 1.toBatch的大小达到 Constants.BATCH_TO_COMMIT
-                // 2.queue为空
-
-                // && (toBatch.size() % Constants.BATCH_TO_COMMIT == 0 || queue.size() == 0)
-                if (toBatch.size() > 0 ) {
-                    try {
-                        logger.debug(this.segment + ":批处理大小：{}", toBatch.size());
-                        persistNum += toBatch.size();
-                        batchPersistData(toBatch);
-                    } catch (Exception e) {
-                        logger.error(this.segment + ":缓存批处理异常", e);
-                    }
-                    toBatch.clear();
-                }
+                // 清空List对象
+                toBatch.clear();
 
                 if (entries.size() < Constants.BATCH_TO_COMMIT) {
                     logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
@@ -139,8 +209,37 @@ public class DBPersistQueue {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void batchPersistData(Collection<CacheEntry> entities) {
-        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
-        Session session = hibernate.getSession();
+        try {
+            for (CacheEntry wrapper : entities) {
+                try {
+                    DBState dbState = wrapper.mirrorDBState();
+                    IEntity e = wrapper.mirrorEntity();
+                    if (DBState.U == dbState) {
+                        try {
+                            // 这里之前报DataIntegrityViolationException
+                            // 是因为，没做好并发控制，persistAndRemove()方法先保存了，但hibernate里慢了一步，也判断要save
+                            // 因此persistAndRemove()方法中要先从队列移除，再persist
+
+                            // todo 去除mirrorDbState
+                            // 猜测：是不是dbState对象的状态不对？？ 不要mirrorDbState了。
+                            hibernate.saveOrUpdate(e);
+                        } catch (ConstraintViolationException e1) {
+                            e1.printStackTrace();
+                            hibernate.save(e);
+                        }
+                    } else if (DBState.D == dbState) {
+                        hibernate.delete(e);
+                    }
+                } catch (DataAccessException e1) {
+                    logger.error("", e1);
+                }
+            }
+        } catch (Exception e) {
+            logger.error(this.segment + ":批处理失败", e);
+        }
+
+
+        /*Session session = hibernate.getSession();
         Transaction tx = session.beginTransaction();
         try {
             int idx = 0;
@@ -201,10 +300,10 @@ public class DBPersistQueue {
             } catch (Exception e) {
                 logger.error(this.segment + ":批处理失败，session.close()异常", e);
             }
-        }
+        }*/
     }
 
-    public FIFOAccessQueue<CacheEntry> getQueue() {
-        return queue;
+    public ConcurrentHashMap<String, CacheEntry> getMap() {
+        return map;
     }
 }

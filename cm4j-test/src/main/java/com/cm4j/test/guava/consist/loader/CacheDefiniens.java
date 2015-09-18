@@ -61,13 +61,4 @@ public abstract class CacheDefiniens<V extends AbsReference> {
 	public V refIfPresent() {
 		return ConcurrentCache.getInstance().getIfPresent(this);
 	}
-
-	/**
-	 * 忽略之前的数值重新加载DB中的最新值
-	 * 
-	 * @return
-	 */
-	public V refresh() {
-		return ConcurrentCache.getInstance().refresh(this);
-	}
 }

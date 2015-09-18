@@ -80,31 +80,23 @@ public abstract class AbsReference {
     }
 
     /**
-     * 持久化后移除<br />
-     * 这个方法一般是用于先移除缓存，然后手动改DB数值，最后缓存重新加载的就是更改后的数值
+     * 持久化后移除，这个方法一般是用于先移除缓存，然后手动改DB数值，最后缓存重新加载的就是更改后的数值
+     *
+     * 注意：它与定时持久化{@link DBPersistQueue}是互斥关系（加锁控制），所以调这个方法可能会等待持久化线程，会稍有性能问题，故不要频繁使用
      *
      * <pre><font color=red>
      * 调用这个方法有可能导致报RuntimeException: 缓存中不存在此对象[$1_157]，无法更改状态
-     * 原因：
+     *
+     * 原因【这是不可避免的】：
      * 如果一个线程已经从缓存获取到数据ref，此时调用此方法会把ref从缓存remove，
      * 也就是缓存中已不存在此数据，如果持有线程再update或者delete，则无法更改缓存状态
+     *
+     * 解决方法：先锁定再获取缓存ref，则不会出现这个问题
+     *
      * </font></pre>
      */
     public void persistAndRemove() {
         ConcurrentCache.getInstance().persistAndRemove(getAttachedKey(), true);
-    }
-
-    /**
-     * 从缓存直接移除，而不保存db
-     *
-     * <pre><font color=red>
-     * 调用这个方法有可能导致报RuntimeException: 缓存中不存在此对象[$1_157]，无法更改状态
-     * 原因请参考：{@link #persistAndRemove()}
-     * </font></pre>
-     */
-    public boolean remove() {
-        Preconditions.checkNotNull(this.attachedKey);
-        return ConcurrentCache.getInstance().remove(this.attachedKey) != null;
     }
 
     /**
@@ -135,16 +127,18 @@ public abstract class AbsReference {
         HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
 
         for (CacheEntry entry : getNotDeletedSet()) {
+            // 从persistQueue移除[不管状态是什么，都要移除]
+            // 注意：要先移除，再做持久化。因为persistQueue也会持久化数据
+
             if (DBState.P != entry.getDbState()) {
                 IEntity entity = entry.parseEntity();
-                if (DBState.U == entry.getDbState()) {
+                /*if (DBState.U == entry.getDbState()) {
                     hibernate.saveOrUpdate(entity);
                 } else if (DBState.D == entry.getDbState()) {
                     hibernate.delete(entity);
                 }
-                entry.setDbState(DBState.P);
-                // 从persistQueue移除
-                ConcurrentCache.getInstance().removeFromPersistQueue(entry);
+                entry.setDbState(DBState.P);*/
+                ConcurrentCache.getInstance().sendToPersistQueueAndPersist(entry);
             }
         }
     }
@@ -153,20 +147,16 @@ public abstract class AbsReference {
      * 将deleteSet中的对象持久化
      */
     protected void persistDeleteSet() {
-        HibernateDao hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
         // deleteSet数据处理
-        Iterator<CacheEntry> iter = getDeletedSet().iterator();
+        Set<CacheEntry> deletedSet = getDeletedSet();
+        Iterator<CacheEntry> iter = deletedSet.iterator();
 
         while (iter.hasNext()) {
             CacheEntry v = iter.next();
-            hibernate.delete(v);
-            // 从保存队列里面移除
-            ConcurrentCache.getInstance().removeFromPersistQueue(v);
-            // 不需要更改缓存状态，因为下面会把deleteSet整个删除
-//            changeDbState(v, DBState.P);
+            ConcurrentCache.getInstance().sendToPersistQueueAndPersist(v);
         }
 
-        getDeletedSet().clear();
+        deletedSet.clear();
     }
 
     /**

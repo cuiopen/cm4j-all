@@ -8,9 +8,12 @@ import java.util.concurrent.*;
  */
 public class CallableAndFuture {
     // 与Runnable类似，不同在于Callable有返回值
-    private final static Callable<Integer> callable = () -> {
-        Thread.sleep(5000);// 可能做一些事情
-        return new Random().nextInt(100);
+    private final static Callable<Integer> callable = new Callable<Integer>() {
+        @Override
+        public Integer call() throws Exception {
+            Thread.sleep(5000);// 可能做一些事情
+            return new Random().nextInt(100);
+        }
     };
 
     /**
@@ -59,9 +62,12 @@ public class CallableAndFuture {
         System.out.println("-----------------------");
         for (int i = 0; i < 5; i++) {
             final int taskID = i;
-            cs.submit(() -> {
-                Thread.sleep(5000);// 可能做一些事情
-                return taskID;
+            cs.submit(new Callable<Integer>() {
+                @Override
+                public Integer call() throws Exception {
+                    Thread.sleep(5000);// 可能做一些事情
+                    return taskID;
+                }
             });
         }
         // 可能做一些事情
