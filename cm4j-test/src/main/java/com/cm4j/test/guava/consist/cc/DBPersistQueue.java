@@ -5,14 +5,18 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.collect.Lists;
+import com.google.common.base.Function;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 
 import javax.validation.ConstraintViolationException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -27,7 +31,7 @@ public class DBPersistQueue {
     private final HibernateDao hibernate;
     private final Segment segment;
 
-    private final ConcurrentHashMap<String, CacheEntry> map;
+    private final ConcurrentHashMap<String, CacheMirror> map;
     // 写入锁[persistAndRemove需要用到写入锁]
     private final Lock writeLock = new ReentrantLock();
     /**
@@ -44,33 +48,38 @@ public class DBPersistQueue {
     /**
      * 发送到更新队列
      *
-     * @param entry
+     * @param mirror
      */
-    public void sendToPersistQueue(CacheEntry entry) {
+    public void sendToPersistQueue(CacheMirror mirror) {
         // 重置persist信息
-        entry.mirror();
-        map.put(entry.getID(), entry);
+        map.put(mirror.getDbKey(), mirror);
     }
 
     public void persistImmediately(Collection<CacheEntry> del, Collection<CacheEntry> up) {
-        HashSet<CacheEntry> all = Sets.newHashSet();
-        all.addAll(del);
-        all.addAll(up);
+        HashSet<Object[]> delSet = Sets.newHashSet();
+        HashSet<Object[]> upSet = Sets.newHashSet();
 
-        for (CacheEntry e : all) {
-            e.mirror();
+        HashSet<String> removeKey = Sets.newHashSet();
+        for (CacheEntry e : del) {
+            CacheMirror mirror = e.mirror();
+            delSet.add(new Object[]{mirror.getEntity(), DBState.D});
+            removeKey.add(mirror.getDbKey());
+        }
+        for (CacheEntry e : up) {
+            CacheMirror mirror = e.mirror();
+            upSet.add(new Object[]{mirror.getEntity(), DBState.U});
+            removeKey.add(mirror.getDbKey());
         }
 
         writeLock.lock();
         try {
-            for (CacheEntry e : all) {
+            for (String key : removeKey) {
                 // 重置persist信息
-                String key = e.getID();
                 map.remove(key);
             }
 
-            batchPersistData(del);
-            batchPersistData(up);
+            batchPersistData(delSet);
+            batchPersistData(upSet);
         } finally {
             writeLock.unlock();
         }
@@ -82,14 +91,16 @@ public class DBPersistQueue {
      * @param size
      * @return
      */
-    public Set<CacheEntry> drain(int size) {
+    public Set<CacheMirror> drain(int size) {
         Enumeration<String> keys = map.keys();
         int i = 0;
         Set result = Sets.newHashSet();
         while (keys.hasMoreElements() && i++ < size) {
             String key = keys.nextElement();
-            CacheEntry value = map.remove(key);
-            if (value != null) {
+            CacheMirror value = map.remove(key);
+
+            // 过滤为P的对象
+            if (value != null && DBState.P != value.getDbState()) {
                 result.add(value);
             }
         }
@@ -115,34 +126,31 @@ public class DBPersistQueue {
         logger.error(this.segment + ":定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queueSize, doNow});
         if (doNow || queueSize >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (currentCounter) % Constants.PERSIST_CHECK_INTERVAL == 0) {
 
-            List<CacheEntry> toBatch = Lists.newArrayList();
-
-            Set<CacheEntry> entries;
+            Set<CacheMirror> entries;
             while (true) {
                 writeLock.lock();
 
                 entries = drain(Constants.BATCH_TO_COMMIT);
-                if (entries.size() == 0) {
-                    logger.error(this.segment + ":定时[{}]检测结束，queue内无数据", currentCounter);
+                int size;
+                if ((size = entries.size()) == 0) {
+                    logger.error("{}:定时[{}]检测结束，queue内无数据", this.segment, currentCounter);
                     break;
                 }
 
                 logger.debug(this.segment + ":缓存存储数据开始，size：" + map.size());
 
                 try {
-                    for (CacheEntry wrapper : entries) {
-                        // 删除或者更新的num为0
-                        IEntity entity = wrapper.mirrorEntity();
-                        if (entity != null && DBState.P != wrapper.mirrorDBState()) {
-                            toBatch.add(wrapper);
-                        }
-                    }
-
-                    if (toBatch.size() > 0) {
+                    if (entries.size() > 0) {
                         try {
-                            logger.debug(this.segment + ":批处理大小：{}", toBatch.size());
-                            persistNum += toBatch.size();
-                            batchPersistData(toBatch);
+                            logger.debug(this.segment + ":批处理大小：{}", size);
+                            persistNum += size;
+                            Collection<Object[]> transform = Collections2.transform(entries, new Function<CacheMirror, Object[]>() {
+                                @Override
+                                public Object[] apply(CacheMirror input) {
+                                    return new Object[]{input.getEntity(), input.getDbState()};
+                                }
+                            });
+                            batchPersistData(transform);
                         } catch (Exception e) {
                             logger.error(this.segment + ":缓存批处理异常", e);
                         }
@@ -151,17 +159,12 @@ public class DBPersistQueue {
                     writeLock.unlock();
                 }
 
-                if (toBatch.size() > 0) {
-                    for (CacheEntry wrapper : toBatch) {
-                        // 注意：这里不要放到lock内
-                        // 因为改状态是要锁定segment的，放到lock内，则出现大锁套小锁，有概率会导致死锁
-                        // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                        ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
-                    }
+                for (CacheMirror mirror : entries) {
+                    // 注意：这里不要放到lock内
+                    // 因为改状态是要锁定segment的，放到lock内，则出现大锁套小锁，有概率会导致死锁
+                    // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
+                    ConcurrentCache.getInstance().changeDbStatePersist(mirror.getCacheEntry());
                 }
-
-                // 清空List对象
-                toBatch.clear();
 
                 if (entries.size() < Constants.BATCH_TO_COMMIT) {
                     logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
@@ -176,12 +179,12 @@ public class DBPersistQueue {
      * 批处理写入数据
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void batchPersistData(Collection<CacheEntry> entities) {
+    private void batchPersistData(Collection<Object[]> entities) {
         try {
-            for (CacheEntry wrapper : entities) {
+            for (Object[] entry : entities) {
                 try {
-                    DBState dbState = wrapper.mirrorDBState();
-                    IEntity e = wrapper.mirrorEntity();
+                    IEntity e = (IEntity) entry[0];
+                    DBState dbState = (DBState) entry[1];
                     if (DBState.U == dbState) {
                         try {
                             // 这里之前报DataIntegrityViolationException
@@ -205,73 +208,9 @@ public class DBPersistQueue {
         } catch (Exception e) {
             logger.error(this.segment + ":批处理失败", e);
         }
-
-
-        /*Session session = hibernate.getSession();
-        Transaction tx = session.beginTransaction();
-        try {
-            int idx = 0;
-
-            for (CacheEntry wrapper : entities) {
-                DBState dbState = wrapper.mirrorDBState();
-                IEntity entity = wrapper.mirrorEntity();
-
-                if (DBState.U == dbState) {
-                    session.merge(entity);
-                } else if (DBState.D == dbState) {
-                    // 为什么会有相同ID的对象进行删除，会报错
-                    // 是否是对象被删除了，然后又新建了一个，然后又被删除了
-                    // 因此在下面的exception中有此处理
-                    session.delete(entity);
-                }
-                if ((++idx) % 50 == 0) {
-                    session.flush(); // 清理缓存，执行批量插入20条记录的SQL insert语句
-                    session.clear(); // 清空缓存中的Customer对象
-                }
-            }
-            // 提交
-            tx.commit();
-            for (CacheEntry wrapper : entities) {
-                // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
-            }
-        } catch (Exception exception) {
-            if (!(exception instanceof NonUniqueObjectException)) {
-                // 在删除时，如果同一个key的不同对象删除，会报NonUniqueObjectException，但这种情况比较少
-                // 可以参考：http://stackoverflow.com/questions/6518567/org-hibernate-nonuniqueobjectexception
-                logger.error(this.segment + ":缓存批处理写入DB异常", exception);
-            }
-            try {
-                tx.rollback();
-            } catch (HibernateException e) {
-                e.printStackTrace();
-            }
-            for (CacheEntry wrapper : entities) {
-                try {
-                    DBState dbState = wrapper.mirrorDBState();
-                    IEntity entity = wrapper.mirrorEntity();
-
-                    if (DBState.U == dbState) {
-                        hibernate.saveOrUpdate(entity);
-                    } else if (DBState.D == dbState) {
-                        hibernate.delete(entity);
-                    }
-                    // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                    ConcurrentCache.getInstance().changeDbStatePersist(wrapper);
-                } catch (Exception e1) {
-                    logger.error(this.segment + ":批处理失败，单条[" + wrapper.ref().getAttachedKey() + "]更新失败", e1);
-                }
-            }
-        } finally {
-            try {
-                session.close();
-            } catch (Exception e) {
-                logger.error(this.segment + ":批处理失败，session.close()异常", e);
-            }
-        }*/
     }
 
-    public ConcurrentHashMap<String, CacheEntry> getMap() {
+    public ConcurrentHashMap<String, CacheMirror> getMap() {
         return map;
     }
 }

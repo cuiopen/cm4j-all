@@ -74,7 +74,7 @@ public class TmpFhhd extends CacheEntry implements IEntity, Cloneable {
 	}
 
     @Override
-    protected String dbUniqueKey() {
+    protected String dbUID() {
         return String.valueOf(getNPlayerId());
     }
 
