@@ -1,12 +1,9 @@
 package com.cm4j.test.guava.consist.usage.caches.performance;
 
-import com.cm4j.dao.hibernate.HibernateDao;
 import com.cm4j.test.guava.consist.caches.TmpFhhdCache;
 import com.cm4j.test.guava.consist.cc.ConcurrentCache;
 import com.cm4j.test.guava.consist.cc.SingleReference;
 import com.cm4j.test.guava.consist.entity.TmpFhhd;
-import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.collect.Lists;
 import org.apache.commons.lang.math.RandomUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -15,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import java.util.ArrayList;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,31 +26,17 @@ import java.util.concurrent.atomic.AtomicLong;
 @ContextConfiguration(locations = {"classpath*:test_1/spring-ds.xml"})
 public class FunctionTest {
 
-    public static void main(String[] args) {
-        for (int j = 0; j < 300; j++) {
-            System.out.println("INSERT INTO `tmp_fhhd` VALUES(" + j + ",1,1,'');");
-        }
-    }
-
     public final Logger logger = LoggerFactory.getLogger(getClass());
-
     private final Object lock = new Object();
 
-    @Test
-    public void test() {
-        HibernateDao hibernateDao = ServiceManager.getInstance().getSpringBean("hibernateDao");
-
-        logger.error("started....");
-        ArrayList<Object> list = Lists.newArrayList();
-        for (int i = 0; i < 300; i++) {
-            TmpFhhd tmpFhhd = new TmpFhhd(i, 1, 1, "");
-            list.add(tmpFhhd);
-//            hibernateDao.saveOrUpdate(tmpFhhd);
-        }
-        hibernateDao.saveOrUpdateAll(list);
-        logger.error("end ....");
-    }
-
+    /**
+     * 纯缓存操作：3线程  每个运行5W次   500个数据   一次操作就是一读一写
+     * 计算消耗时间：3.395193967
+     * 写入消耗时间：13.899111979
+     *
+     * @throws InterruptedException
+     * @throws BrokenBarrierException
+     */
     @Test
     public void funcTest() throws InterruptedException, BrokenBarrierException {
         int num = 3;
@@ -91,7 +73,7 @@ public class FunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 2000; i++) { // 执行20000次
+                for (int i = 0; i < 50000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
                         int random = RandomUtils.nextInt(500);
@@ -116,10 +98,9 @@ public class FunctionTest {
                                     fhhd.increaseValue();
                                     fhhd.update();
 
-                                    // todo remove有问题，加上数据不一致，谨慎操作
                                     // 数据不一致，貌似是因为 缓存remove不是现场安全的，
-                                    // remove后另一个线程获取的还是之前的ref， todo why？？？
-                                     ref.persistAndRemove();
+                                    // remove后另一个线程获取的还是之前的ref
+                                    // ref.persistAndRemove();
 
                                     counter.incrementAndGet();
                                 } else {

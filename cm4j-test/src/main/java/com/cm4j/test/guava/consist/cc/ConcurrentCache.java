@@ -353,7 +353,8 @@ public class ConcurrentCache {
     void sendToPersistQueue(CacheEntry entry) {
         String key = entry.ref().getAttachedKey();
         int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).getPersistQueue().sendToPersistQueue(entry);
+        CacheMirror mirror = entry.mirror();
+        segmentFor(hash).getPersistQueue().sendToPersistQueue(mirror);
     }
 
     void persistImmediately(String key, Collection<CacheEntry> del, Collection<CacheEntry> up) {
