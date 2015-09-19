@@ -51,7 +51,6 @@ public class FunctionTest {
         long end = System.nanoTime();
 
         ConcurrentCache.getInstance().stop();
-
         long writeEnd = System.nanoTime();
 
         System.out.println("======================");
