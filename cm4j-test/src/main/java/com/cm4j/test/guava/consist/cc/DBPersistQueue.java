@@ -163,7 +163,7 @@ public class DBPersistQueue {
                     // 注意：这里不要放到lock内
                     // 因为改状态是要锁定segment的，放到lock内，则出现大锁套小锁，有概率会导致死锁
                     // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                    ConcurrentCache.getInstance().changeDbStatePersist(mirror.getCacheEntry());
+                    ConcurrentCache.getInstance().changeDbStatePersist(mirror.getCacheEntry(), mirror.getVersion());
                 }
 
                 if (entries.size() < Constants.BATCH_TO_COMMIT) {

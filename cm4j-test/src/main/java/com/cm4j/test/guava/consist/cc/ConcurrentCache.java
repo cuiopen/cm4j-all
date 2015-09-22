@@ -261,7 +261,7 @@ public class ConcurrentCache {
      * @param entry
      * @return 是否成功修改
      */
-    boolean changeDbStatePersist(final CacheEntry entry) {
+    boolean changeDbStatePersist(final CacheEntry entry,final int version) {
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
 
         final String key = entry.ref().getAttachedKey();
@@ -269,8 +269,8 @@ public class ConcurrentCache {
         boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Boolean>() {
             @Override
             public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                // 没过期或者没没全保存??
-                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
+                // 版本一致才可以保存
+                if (e != null && e.getQueueEntry() != null && entry.getVersion() == version) {
                     if (e.getQueueEntry().changeDbState(entry, DBState.P)) {
                         return true;
                     }
@@ -297,8 +297,7 @@ public class ConcurrentCache {
         Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
 
         Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
-        Preconditions.checkNotNull(dbState, "DbState不允许为null");
-        Preconditions.checkState(DBState.P != dbState, "DbState不允许为持久化");
+        Preconditions.checkState(dbState != null && DBState.P != dbState, "DbState不允许为持久化");
 
         final String key = entry.ref().getAttachedKey();
         int hash = CCUtils.rehash(key.hashCode());
@@ -308,6 +307,8 @@ public class ConcurrentCache {
                 if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
                     // 更改CacheEntry的状态
                     if (e.getQueueEntry().changeDbState(entry, dbState)) {
+                        // 每次修改，版本+1
+                        entry.setVersion(entry.getVersion() + 1);
                         return null;
                     } else {
                         throw new RuntimeException("缓存[" + key + "]更改状态失败");

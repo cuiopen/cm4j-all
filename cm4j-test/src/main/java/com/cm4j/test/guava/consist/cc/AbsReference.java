@@ -91,7 +91,7 @@ public abstract class AbsReference {
      * 如果一个线程已经从缓存获取到数据ref，此时调用此方法会把ref从缓存remove，
      * 也就是缓存中已不存在此数据，如果持有线程再update或者delete，则无法更改缓存状态
      *
-     * 解决方法：先锁定再获取缓存ref，则不会出现这个问题
+     * 解决方法：调用者自行控制并发，保证调用线程安全。先锁定再获取缓存ref，则不会出现这个问题
      *
      * </font></pre>
      */
@@ -124,8 +124,6 @@ public abstract class AbsReference {
      * <font color="red">此方法在lock下被调用</font>
      */
     protected void persistImmediately(){
-
-
         // 需要删除数据
         Set<CacheEntry> deletedSet = getDeletedSet();
         Set<CacheEntry> delSet = Sets.newHashSet(deletedSet);

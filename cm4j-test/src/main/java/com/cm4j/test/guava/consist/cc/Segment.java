@@ -378,7 +378,9 @@ final class Segment extends ReentrantLock implements Serializable {
             // accessQueue大小应该与count一致
             Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
-            if (e.getQueueEntry().isAllPersist()) {
+            AbsReference ref = e.getQueueEntry();
+            if (ref.isAllPersist()) {
+                logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
                 removeEntry(e, e.getHash());
             } else {
                 recordAccess(e);
