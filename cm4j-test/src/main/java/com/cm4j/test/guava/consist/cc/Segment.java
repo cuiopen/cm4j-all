@@ -1,6 +1,7 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.constants.Constants;
+import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -261,6 +263,10 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    /**
+     * 这个方法真的应该存在么？
+     */
+    @Deprecated
     void clear() {
         if (count != 0) {
             lock();
@@ -357,6 +363,36 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    /**
+     * 把所有未持久化对象都发送到persistQueue用于保存
+     */
+    void drainAllToPersistQueue() {
+        lock();
+        try{
+            drainRecencyQueue();
+            HashEntry e;
+
+            while ((e = accessQueue.poll()) != null) {
+                AbsReference ref = e.getQueueEntry();
+                Set<CacheEntry> deletedSet = ref.getDeletedSet();
+                for (CacheEntry entry : deletedSet) {
+                    CacheMirror mirror = entry.mirror();
+                    getPersistQueue().sendToPersistQueue(mirror);
+                }
+                deletedSet.clear();
+
+                Set<CacheEntry> notDeletedSet = ref.getNotDeletedSet();
+                for (CacheEntry entry : notDeletedSet) {
+                    CacheMirror mirror = entry.mirror();
+                    getPersistQueue().sendToPersistQueue(mirror);
+                    entry.changeDbState(DBState.P);
+                }
+            }
+        } finally {
+            unlock();
+        }
+    }
+
     // 调用方都有锁
     void expireEntries(long now) {
         drainRecencyQueue();
@@ -367,24 +403,47 @@ final class Segment extends ReentrantLock implements Serializable {
         HashEntry e;
         HashEntry firstEntry = null;
         while ((e = accessQueue.peek()) != null && isExpired(e, now)) {
-            if (firstEntry == null) {
+
+            // 现在是每循环到都移除，不存在上面的循环问题
+            /*if (firstEntry == null) {
                 // 第一次循环，设置first
                 firstEntry = e;
             } else if (e == firstEntry) {
                 // 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
                 break;
-            }
+            }*/
+
+            // 移除第一个
+            accessQueue.poll();
 
             // accessQueue大小应该与count一致
             Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
+            // 发送当前数据到persistQueue
             AbsReference ref = e.getQueueEntry();
-            if (ref.isAllPersist()) {
+            Set<CacheEntry> deletedSet = ref.getDeletedSet();
+            for (CacheEntry entry : deletedSet) {
+                CacheMirror mirror = entry.mirror();
+                getPersistQueue().sendToPersistQueue(mirror);
+            }
+            deletedSet.clear();
+
+            Set<CacheEntry> notDeletedSet = ref.getNotDeletedSet();
+            for (CacheEntry entry : notDeletedSet) {
+                CacheMirror mirror = entry.mirror();
+                getPersistQueue().sendToPersistQueue(mirror);
+                entry.changeDbState(DBState.P);
+            }
+
+            /*if (ref.isAllPersist()) {
                 logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
                 removeEntry(e, e.getHash());
             } else {
                 recordAccess(e);
-            }
+            }*/
+
+            logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
+            removeEntry(e, e.getHash());
         }
     }
 

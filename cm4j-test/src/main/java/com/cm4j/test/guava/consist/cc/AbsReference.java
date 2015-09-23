@@ -3,12 +3,10 @@ package com.cm4j.test.guava.consist.cc;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Reference的一些公共方法
@@ -17,6 +15,8 @@ import java.util.Set;
  * @since 2013-3-2 上午10:42:59
  */
 public abstract class AbsReference {
+
+    private final Map<String,Object[]> persistMap = Maps.newHashMap();
 
     // 用于存放暂时未被删除对象
     // 里面对象只能被删除，不可更改状态
@@ -180,5 +180,9 @@ public abstract class AbsReference {
 
     public Set<CacheEntry> getDeletedSet() {
         return deletedSet;
+    }
+
+    public Map<String, Object[]> getPersistMap() {
+        return persistMap;
     }
 }

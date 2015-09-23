@@ -72,7 +72,7 @@ public class FunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 50000; i++) { // 执行20000次
+                for (int i = 0; i < 500000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
                         int random = RandomUtils.nextInt(500);
@@ -93,7 +93,7 @@ public class FunctionTest {
                                 counter.incrementAndGet();
                             } else {
                                 double d = RandomUtils.nextDouble();
-                                if (d >= 0.5) { // >=0 一定成立，则无删除
+                                if (d >= 0) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
 

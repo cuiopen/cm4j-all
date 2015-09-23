@@ -83,9 +83,11 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 */
 	protected void changeDbState(DBState dbState) {
 		setDbState(dbState);
-		if (DBState.P != dbState) {
+
+        // 这里只修改状态，不发送到queue了
+		/*if (DBState.P != dbState) {
 			ConcurrentCache.getInstance().sendToPersistQueue(this);
-		}
+		}*/
 	}
 
 	/**

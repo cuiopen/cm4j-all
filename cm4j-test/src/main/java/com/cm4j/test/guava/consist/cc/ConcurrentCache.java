@@ -374,10 +374,13 @@ public class ConcurrentCache {
         Stopwatch watch = Stopwatch.createStarted();
         stop.set(true);
 
+        long now = System.currentTimeMillis();
+
         for (final Segment segment : segments) {
             service.submit(new Runnable() {
                 @Override
                 public void run() {
+                    segment.drainAllToPersistQueue();
                     segment.getPersistQueue().consumePersistQueue(true);
                 }
             });
