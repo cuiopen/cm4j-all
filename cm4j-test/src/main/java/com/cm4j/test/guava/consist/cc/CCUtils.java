@@ -19,7 +19,7 @@ public class CCUtils {
         return System.nanoTime();
     }
 
-    static interface SegmentLockHandler<R> {
-        R doInSegmentUnderLock(Segment segment, HashEntry e);
+    interface SegmentLockHandler<R> {
+        R doInSegmentUnderLock(Segment segment, HashEntry e, AbsReference ref);
     }
 }

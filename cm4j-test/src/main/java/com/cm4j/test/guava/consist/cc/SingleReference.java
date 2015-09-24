@@ -1,7 +1,7 @@
 package com.cm4j.test.guava.consist.cc;
 
-import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -30,12 +30,32 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
         return v;
     }
 
-    /**
-     * 新增或修改<br>
-     * 注意：修改的对象必须是 {@link SingleReference#v} 被删除的对象不允许再被修改
-     */
     public void update(V v) {
-        Preconditions.checkNotNull(v);
+        updateEntry(v);
+    }
+
+    /**
+     * 从db删除，而不是移除缓存
+     */
+    public void delete() {
+        deleteEntry(this.v);
+    }
+
+    @Override
+    public Set<CacheEntry> getNotDeletedSet() {
+        HashSet<CacheEntry> set = Sets.newHashSet();
+        if (this.v != null) {
+            set.add(this.v);
+        }
+        return set;
+    }
+
+    /*
+     * ================== extend methods under lock ====================
+     */
+    @Override
+    protected void _update(CacheEntry e) {
+        V v = (V) e;
         if (this.v == null) {
             // 代表v是新增的
             v.resetRef(this);
@@ -44,50 +64,12 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
             throw new RuntimeException("SingleReference中对象已存在，不允许修改其他对象");
         }
         this.v = v;
-        ConcurrentCache.getInstance().changeDbState(this.v, DBState.U);
     }
 
-    /**
-     * 从db删除，而不是移除缓存
-     */
-    public void delete() {
-        delete(this.v);
-    }
-
-    /*
-     * ================== extend methods under lock ====================
-     */
     @Override
-    protected void updateEntry(CacheEntry e) {
-        @SuppressWarnings("unchecked")
+    protected void _delete(CacheEntry e) {
         V v = (V) e;
-        this.update(v);
-    }
-
-    @Override
-    protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-        // deleteSet中数据状态修改
-        if (checkAndDealDeleteSet(entry, dbState)) {
-            return true;
-        }
-
-        Preconditions.checkArgument(this.v == entry, "缓存内对象不一致");
-
-        entry.changeDbState(dbState);
-        // v对象处理
-        if (DBState.D == dbState) {
-            getDeletedSet().add(this.v);
-            this.v = null;
-        }
-        return true;
-    }
-
-    @Override
-    public Set<CacheEntry> getNotDeletedSet() {
-        HashSet<CacheEntry> set = new HashSet<CacheEntry>();
-        if (this.v != null) {
-            set.add(this.v);
-        }
-        return set;
+        Preconditions.checkArgument(this.v == v, "对象不一致，无法删除");
+        this.v = null;
     }
 }

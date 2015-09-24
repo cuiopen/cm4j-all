@@ -52,18 +52,18 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
         value.resetRef(this);
         map.put(key, value);
 
-        ConcurrentCache.getInstance().changeDbState(value, DBState.U);
+        changeDbState(value, DBState.U);
     }
 
     public void update(V value) {
         Preconditions.checkArgument(map.containsValue(value), "对象不存在，请通过put(K,V)增加对象到缓存中");
         // 存在则修改
-        ConcurrentCache.getInstance().changeDbState(value, DBState.U);
+        changeDbState(value, DBState.U);
     }
 
     public void delete(K key) {
         V v = map.get(key);
-        delete(v);
+        deleteEntry(v);
     }
 
 	/*
@@ -78,26 +78,13 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
     }
 
     @Override
-    protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-        // deleteSet中数据状态修改
-        if (checkAndDealDeleteSet(entry, dbState)) {
-            return true;
-        }
+    protected void _update(CacheEntry e) {
 
-        Set<Map.Entry<K, V>> entries = map.entrySet();
-        for (Map.Entry<K, V> kvEntry : entries) {
-            K key = kvEntry.getKey();
-            V value = kvEntry.getValue();
-            if (value == entry) {
-                value.changeDbState(dbState);
-                if (DBState.D == dbState) {
-                    getDeletedSet().add(value);
-                    map.remove(key);
-                }
-                return true;
-            }
-        }
-        return false;
+    }
+
+    @Override
+    protected void _delete(CacheEntry e) {
+
     }
 
     @Override

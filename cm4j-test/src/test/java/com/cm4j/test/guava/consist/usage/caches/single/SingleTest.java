@@ -19,6 +19,20 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 public class SingleTest {
 
     @Test
+    public void businessTest() {
+        SingleReference<TmpFhhd> ref = new TmpFhhdCache(50769).ref();
+        TmpFhhd tmpFhhd = ref.get();
+        if (tmpFhhd == null) {
+            ref.update(new TmpFhhd(50769, 10, 10, ""));
+        } else {
+            tmpFhhd.setNCurToken(11);
+            tmpFhhd.update();
+        }
+        ref.delete();
+        ref.persistAndRemove();
+    }
+
+    @Test
     public void getTest() throws Exception {
         TmpFhhd fhhd = ConcurrentCache.getInstance().get(new TmpFhhdCache(50769)).get();
         TmpFhhd fhhd2 = new TmpFhhdCache(50769).ref().get();

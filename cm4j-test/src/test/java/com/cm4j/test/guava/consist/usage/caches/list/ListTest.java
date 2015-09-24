@@ -48,7 +48,7 @@ public class ListTest {
 
         Assert.assertEquals(1, new TmpListMultikeyListCache(50705).findByType(2).getNValue());
 
-        ref.delete(table);
+        ref.deleteEntry(table);
         // table.delete();
 
         TmpListMultikey val = new TmpListMultikeyListCache(50705).findByType(2);

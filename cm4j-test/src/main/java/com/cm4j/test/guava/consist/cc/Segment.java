@@ -1,18 +1,20 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.constants.Constants;
-import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -95,10 +97,7 @@ final class Segment extends ReentrantLock implements Serializable {
         } else if (isExpired(e, now)) {
             // 如果状态不是P，则会延迟生命周期
             tryExpireEntries(now);
-            // 非精准查询，如果延长生命周期，这里依然返回null，get()调用时需在有锁情况下做二次检测
-            if (e.getQueueEntry().isAllPersist()) {
-                return null;
-            }
+            return null;
         }
         return e;
     }
@@ -155,7 +154,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
                     ref = e.getQueueEntry();
 
-                    if (ref != null && !(isExpired(e, now) && !ref.isAllPersist())) {
+                    if (ref != null && !isExpired(e, now)) {
                         recordAccess(e);
                         return ref;
                     }
@@ -249,9 +248,16 @@ final class Segment extends ReentrantLock implements Serializable {
 
             if (e != null) {
                 AbsReference ref = e.getQueueEntry();
-                if (ref != null && !ref.isAllPersist()) {
+                if (ref != null) {
                     // 数据保存
-                    ref.persistImmediately();
+                    Collection<PersistValue> values = ref.getPersistMap().values();
+                    if (!values.isEmpty()) {
+                        ArrayList<Object[]> objs = Lists.newArrayList();
+                        for (PersistValue value : values) {
+                            objs.add(new Object[]{value.getEntry().parseEntity(), value.getDbState()});
+                        }
+                        this.persistQueue.batchPersistData(objs);
+                    }
                 }
                 if (isRemove) {
                     // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
@@ -373,20 +379,9 @@ final class Segment extends ReentrantLock implements Serializable {
             HashEntry e;
 
             while ((e = accessQueue.poll()) != null) {
-                AbsReference ref = e.getQueueEntry();
-                Set<CacheEntry> deletedSet = ref.getDeletedSet();
-                for (CacheEntry entry : deletedSet) {
-                    CacheMirror mirror = entry.mirror();
-                    getPersistQueue().sendToPersistQueue(mirror);
-                }
-                deletedSet.clear();
-
-                Set<CacheEntry> notDeletedSet = ref.getNotDeletedSet();
-                for (CacheEntry entry : notDeletedSet) {
-                    CacheMirror mirror = entry.mirror();
-                    getPersistQueue().sendToPersistQueue(mirror);
-                    entry.changeDbState(DBState.P);
-                }
+                Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
+                this.persistQueue.sendToPersistQueue(persistMap.values());
+                persistMap.clear();
             }
         } finally {
             unlock();
@@ -397,53 +392,19 @@ final class Segment extends ReentrantLock implements Serializable {
     void expireEntries(long now) {
         drainRecencyQueue();
 
-        // 如果缓存isExpire但是没有保存db，这时会不会死循环？
-        // 应该会的，因为peek每次都是获取的第一个。如果第一个没移除下次循环还是它，就死循环了
-        // 所以直接把缓存的生命周期后移，同时如果在遍历时再碰到此对象，则退出遍历
         HashEntry e;
-        HashEntry firstEntry = null;
         while ((e = accessQueue.peek()) != null && isExpired(e, now)) {
-
-            // 现在是每循环到都移除，不存在上面的循环问题
-            /*if (firstEntry == null) {
-                // 第一次循环，设置first
-                firstEntry = e;
-            } else if (e == firstEntry) {
-                // 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
-                break;
-            }*/
-
-            // 移除第一个
-            accessQueue.poll();
-
             // accessQueue大小应该与count一致
             Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
 
             // 发送当前数据到persistQueue
-            AbsReference ref = e.getQueueEntry();
-            Set<CacheEntry> deletedSet = ref.getDeletedSet();
-            for (CacheEntry entry : deletedSet) {
-                CacheMirror mirror = entry.mirror();
-                getPersistQueue().sendToPersistQueue(mirror);
-            }
-            deletedSet.clear();
+            Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
+            this.persistQueue.sendToPersistQueue(persistMap.values());
 
-            Set<CacheEntry> notDeletedSet = ref.getNotDeletedSet();
-            for (CacheEntry entry : notDeletedSet) {
-                CacheMirror mirror = entry.mirror();
-                getPersistQueue().sendToPersistQueue(mirror);
-                entry.changeDbState(DBState.P);
-            }
-
-            /*if (ref.isAllPersist()) {
-                logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
-                removeEntry(e, e.getHash());
-            } else {
-                recordAccess(e);
-            }*/
-
-            logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
+            // 移除entry
+            // 这里会移除accessQueue，所以上面用peek而不是poll
             removeEntry(e, e.getHash());
+            logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), e.getQueueEntry()});
         }
     }
 
@@ -597,7 +558,8 @@ final class Segment extends ReentrantLock implements Serializable {
             while (e != null && (e.getHash() != hash || !key.equals(e.getKey())))
                 e = e.getNext();
 
-            return handler.doInSegmentUnderLock(this, e);
+            AbsReference ref = e != null ? e.getQueueEntry() : null;
+            return handler.doInSegmentUnderLock(this, e, ref);
         } finally {
             unlock();
         }

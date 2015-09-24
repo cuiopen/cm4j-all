@@ -1,7 +1,6 @@
 package com.cm4j.test.guava.consist.cc;
 
 import com.cm4j.test.guava.consist.cc.constants.Constants;
-import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
@@ -22,8 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 读写分离：
  * 读取：{@link ConcurrentCache}提供get or load、put、expire操作
  *
- * 写入：是由{@link CacheEntry#changeDbState(com.cm4j.test.guava.consist.cc.persist.DBState)}控制对象状态
- * 同时{@link ConcurrentCache}独立维护了一份写入队列，独立于缓存操作
+ * 写入：。。。。
  *
  * 使用流程：
  * 1.定义缓存描述信息{@link com.cm4j.test.guava.consist.loader.CacheDefiniens}
@@ -254,69 +252,9 @@ public class ConcurrentCache {
 
 	/* ---------------- 内部方法 -------------- */
 
-    /**
-     * 在没有修改的时候，即entry.getIsChanged().get() == 0时调用<br>
-     * 它会在有锁的情况下检测修改数量是否为0，如果为0则修改为P，否则代表有其他线程修改了，不更改为P
-     *
-     * @param entry
-     * @return 是否成功修改
-     */
-    boolean changeDbStatePersist(final CacheEntry entry,final int version) {
-        Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
-
-        final String key = entry.ref().getAttachedKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        boolean result = segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Boolean>() {
-            @Override
-            public Boolean doInSegmentUnderLock(Segment segment, HashEntry e) {
-                // 版本一致才可以保存
-                if (e != null && e.getQueueEntry() != null && entry.getVersion() == version) {
-                    if (e.getQueueEntry().changeDbState(entry, DBState.P)) {
-                        return true;
-                    }
-                }
-                // TODO 临时禁用，正常要使用throw来警告
-                // 过期了 或者 全保存了会走到这里
-                // 如果persistAndRemove，则persitQueue则持久化该状态则可能走到这里
-                return true;
-                // 不存在或过期
-//                throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
-            }
-        });
-        return result;
-    }
-
-    /**
-     * 更改db状态并发送到更新队列，缓存不应直接调用此方法<br>
-     * 注意：entry必须是在缓存中存在的，且entry.attachedKey都不能为null
-     *
-     * @param entry
-     * @param dbState U or D,不允许P
-     */
-    void changeDbState(final CacheEntry entry, final DBState dbState) {
-        Preconditions.checkArgument(!stop.get(), "缓存已关闭，无法写入缓存");
-
-        Preconditions.checkNotNull(entry.ref(), "CacheEntry中ref不允许为null");
-        Preconditions.checkState(dbState != null && DBState.P != dbState, "DbState不允许为持久化");
-
-        final String key = entry.ref().getAttachedKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).doInSegmentUnderLock(key, hash, new CCUtils.SegmentLockHandler<Void>() {
-            @Override
-            public Void doInSegmentUnderLock(Segment segment, HashEntry e) {
-                if (e != null && e.getQueueEntry() != null && !isExipredAndAllPersist(e, CCUtils.now())) {
-                    // 更改CacheEntry的状态
-                    if (e.getQueueEntry().changeDbState(entry, dbState)) {
-                        // 每次修改，版本+1
-                        entry.setVersion(entry.getVersion() + 1);
-                        return null;
-                    } else {
-                        throw new RuntimeException("缓存[" + key + "]更改状态失败");
-                    }
-                }
-                throw new RuntimeException("缓存中不存在此对象[" + key + "]，无法更改状态");
-            }
-        });
+    void doUnderLock(final String cacheKey,CCUtils.SegmentLockHandler handler) {
+        int hash = CCUtils.rehash(cacheKey.hashCode());
+        segmentFor(hash).doInSegmentUnderLock(cacheKey, hash, handler);
     }
 
 	/* ---------------- expiration ---------------- */
@@ -328,39 +266,13 @@ public class ConcurrentCache {
         return false;
     }
 
-    /**
-     * 过期且所有对象已存储
-     *
-     * @param entry
-     * @param now
-     * @return
-     */
-    private boolean isExipredAndAllPersist(HashEntry entry, long now) {
-        if (isExpired(entry, now) && entry.getQueueEntry().isAllPersist()) {
-            return true;
-        }
-        return false;
-    }
-
     /*
      * ================== utils =====================
 	 */
 
-    /**
-     * 发送到persistQueue队列
-     *
-     * @param entry
-     */
-    void sendToPersistQueue(CacheEntry entry) {
-        String key = entry.ref().getAttachedKey();
-        int hash = CCUtils.rehash(key.hashCode());
-        CacheMirror mirror = entry.mirror();
-        segmentFor(hash).getPersistQueue().sendToPersistQueue(mirror);
-    }
-
     void persistImmediately(String key, Collection<CacheEntry> del, Collection<CacheEntry> up) {
         int hash = CCUtils.rehash(key.hashCode());
-        segmentFor(hash).getPersistQueue().persistImmediately(del,up);
+        // segmentFor(hash).getPersistQueue().persistImmediately(del,up);
     }
 
     // 缓存关闭标识

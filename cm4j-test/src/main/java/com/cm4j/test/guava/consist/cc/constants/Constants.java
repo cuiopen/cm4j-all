@@ -18,8 +18,8 @@ public class Constants {
     public static final int MAX_SEGMENTS = 1 << 16; // slightly conservative
     public static final int RETRIES_BEFORE_LOCK = 2;
 
-    // TODO 默认过期纳秒，完成时需更改为较长时间过期，50ms 用于并发测试
-    public static final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(50);
+    // TODO 默认过期纳秒，完成时需更改为较长时间过期，过短调试的时候可能会报缓存过期不存在
+    public static final long expireAfterAccessNanos = TimeUnit.SECONDS.toNanos(120);
     /**
      * TODO 更新队列检测间隔，单位s
      */

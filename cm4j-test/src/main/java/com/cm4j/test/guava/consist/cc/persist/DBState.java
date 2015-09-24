@@ -8,10 +8,7 @@ package com.cm4j.test.guava.consist.cc.persist;
  * 
  */
 public enum DBState {
-	/**
-	 * persist - 持久状态
-	 */
-	P,
+
 	/**
 	 * delete - 删除
 	 */

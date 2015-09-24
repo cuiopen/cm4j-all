@@ -72,10 +72,10 @@ public class FunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 500000; i++) { // 执行20000次
+                for (int i = 0; i < 200000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
-                        int random = RandomUtils.nextInt(500);
+                        int random = RandomUtils.nextInt(1000);
 
                         synchronized (lock) {
                             // 这一段要放在锁内，否则多线程获取ref，另一个线程remove缓存，则当前线程的ref就过期了。
@@ -93,13 +93,13 @@ public class FunctionTest {
                                 counter.incrementAndGet();
                             } else {
                                 double d = RandomUtils.nextDouble();
-                                if (d >= 0) { // >=0 一定成立，则无删除
+                                if (d >= 0.5) { // >=0 一定成立，则无删除
                                     fhhd.increaseValue();
                                     fhhd.update();
 
                                     // 数据不一致，貌似是因为 缓存remove不是现场安全的，
                                     // remove后另一个线程获取的还是之前的ref
-                                    // ref.persistAndRemove();
+                                     // ref.persistAndRemove();
 
                                     counter.incrementAndGet();
                                 } else {

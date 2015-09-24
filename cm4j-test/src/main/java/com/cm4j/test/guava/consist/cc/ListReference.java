@@ -33,7 +33,7 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 	 */
 
     /**
-     * 获取，如果要增删，不要直接对list操作，应调用{@link #delete(CacheEntry)},
+     * 获取，如果要增删，不要直接对list操作，应调用{@link #deleteEntry(CacheEntry)},
      * {@link #update(CacheEntry)}
      *
      * @return 不可更改的list，以防止外部破坏内部结构和状态
@@ -48,12 +48,12 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
      * 新增或修改
      */
     public void update(V v) {
-        if (!all_objects.contains(v)) {
-            // 新增的
-            v.resetRef(this);
-            all_objects.add(v);
-        }
-        ConcurrentCache.getInstance().changeDbState(v, DBState.U);
+        updateEntry(v);
+    }
+
+    @Override
+    public Set<CacheEntry> getNotDeletedSet() {
+        return new HashSet<CacheEntry>(all_objects);
     }
 
 	/*
@@ -61,34 +61,18 @@ public class ListReference<V extends CacheEntry> extends AbsReference {
 	 */
 
     @Override
-    protected void updateEntry(CacheEntry e) {
-        @SuppressWarnings("unchecked")
+    protected void _update(CacheEntry e) {
         V v = (V) e;
-        this.update(v);
+        if (!all_objects.contains(v)) {
+            // 新增的
+            v.resetRef(this);
+            all_objects.add(v);
+        }
+        changeDbState(v, DBState.U);
     }
 
     @Override
-    protected boolean changeDbState(CacheEntry entry, DBState dbState) {
-        // deleteSet中数据状态修改
-        if (checkAndDealDeleteSet(entry, dbState)) {
-            return true;
-        }
+    protected void _delete(CacheEntry e) {
 
-        for (V e : all_objects) {
-            if (e == entry) {
-                e.changeDbState(dbState);
-                if (DBState.D == dbState) {
-                    getDeletedSet().add(e);
-                    this.all_objects.remove(e);
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public Set<CacheEntry> getNotDeletedSet() {
-        return new HashSet<CacheEntry>(all_objects);
     }
 }

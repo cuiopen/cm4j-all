@@ -15,7 +15,6 @@ import org.springframework.dao.DataAccessException;
 import javax.validation.ConstraintViolationException;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -41,47 +40,14 @@ public class DBPersistQueue {
 
     public DBPersistQueue(Segment segment) {
         this.segment = segment;
-        map = new ConcurrentHashMap<>();
+        map = new ConcurrentHashMap<String, CacheMirror>();
         hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
     }
 
-    /**
-     * 发送到更新队列
-     *
-     * @param mirror
-     */
-    public void sendToPersistQueue(CacheMirror mirror) {
-        // 重置persist信息
-        map.put(mirror.getDbKey(), mirror);
-    }
-
-    public void persistImmediately(Collection<CacheEntry> del, Collection<CacheEntry> up) {
-        HashSet<Object[]> delSet = Sets.newHashSet();
-        HashSet<Object[]> upSet = Sets.newHashSet();
-
-        HashSet<String> removeKey = Sets.newHashSet();
-        for (CacheEntry e : del) {
-            CacheMirror mirror = e.mirror();
-            delSet.add(new Object[]{mirror.getEntity(), DBState.D});
-            removeKey.add(mirror.getDbKey());
-        }
-        for (CacheEntry e : up) {
-            CacheMirror mirror = e.mirror();
-            upSet.add(new Object[]{mirror.getEntity(), DBState.U});
-            removeKey.add(mirror.getDbKey());
-        }
-
-        writeLock.lock();
-        try {
-            for (String key : removeKey) {
-                // 重置persist信息
-                map.remove(key);
-            }
-
-            batchPersistData(delSet);
-            batchPersistData(upSet);
-        } finally {
-            writeLock.unlock();
+    public void sendToPersistQueue(Collection<PersistValue> values) {
+        for (PersistValue value : values) {
+            CacheMirror mirror = value.getEntry().mirror(value.getDbState());
+            map.put(value.getEntry().getID(), mirror);
         }
     }
 
@@ -100,7 +66,7 @@ public class DBPersistQueue {
             CacheMirror value = map.remove(key);
 
             // 过滤为P的对象
-            if (value != null && DBState.P != value.getDbState()) {
+            if (value != null) {
                 result.add(value);
             }
         }
@@ -159,13 +125,6 @@ public class DBPersistQueue {
                     writeLock.unlock();
                 }
 
-                for (CacheMirror mirror : entries) {
-                    // 注意：这里不要放到lock内
-                    // 因为改状态是要锁定segment的，放到lock内，则出现大锁套小锁，有概率会导致死锁
-                    // recheck,有可能又有其他线程更新了对象，此时也不能重置为P
-                    ConcurrentCache.getInstance().changeDbStatePersist(mirror.getCacheEntry(), mirror.getVersion());
-                }
-
                 if (entries.size() < Constants.BATCH_TO_COMMIT) {
                     logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
                     break;
@@ -179,7 +138,7 @@ public class DBPersistQueue {
      * 批处理写入数据
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void batchPersistData(Collection<Object[]> entities) {
+    public void batchPersistData(Collection<Object[]> entities) {
         try {
             for (Object[] entry : entities) {
                 try {
@@ -191,8 +150,6 @@ public class DBPersistQueue {
                             // 是因为，没做好并发控制，persistAndRemove()方法先保存了，但hibernate里慢了一步，也判断要save
                             // 因此persistAndRemove()方法中要先从队列移除，再persist
 
-                            // todo 去除mirrorDbState
-                            // 猜测：是不是dbState对象的状态不对？？ 不要mirrorDbState了。
                             hibernate.saveOrUpdate(e);
                         } catch (ConstraintViolationException e1) {
                             e1.printStackTrace();

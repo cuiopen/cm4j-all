@@ -18,9 +18,8 @@ public class CacheMirror {
     // 生成的即时镜像entity
     private final IEntity entity;
     private final DBState dbState;
-    private final int version;
 
-    public CacheMirror(CacheEntry cacheEntry, IEntity entity) {
+    public CacheMirror(CacheEntry cacheEntry, IEntity entity, DBState dbState) {
         this.cacheEntry = cacheEntry;
 
         // 这2个不会变，其实可以不用加在这里面
@@ -29,8 +28,7 @@ public class CacheMirror {
 
         // 这几个字段会变的，需要在mirror的时候就确定下来
         this.entity = entity;
-        this.dbState = cacheEntry.getDbState();
-        this.version = cacheEntry.getVersion();
+        this.dbState = dbState;
     }
 
     public String getKey() {
@@ -53,7 +51,4 @@ public class CacheMirror {
         return dbState;
     }
 
-    public int getVersion() {
-        return version;
-    }
 }

@@ -17,21 +17,11 @@ import org.springframework.beans.BeanUtils;
  */
 public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 
-	/**
-	 * 缓存状态 - 默认持久化
-	 */
-	private volatile DBState dbState = DBState.P;
-    /**
-     * 当前缓存的修改版本号，每修改一次+1
-     * 用于设置状态P的时候判断版本是否一致，不一致代表被业务线程修改了，不能改为P
-     */
-    private volatile int version;
-
     /**
      * 放入队列时
      * 需要把当前状态和数据做一个镜像备份，保存db时就用备份数据，这样不会出现当前数据更改了，影响到保存DB的数据
      */
-    public CacheMirror mirror() {
+    public CacheMirror mirror(DBState dbState) {
         IEntity mirror = null;
         IEntity parseEntity = this.parseEntity();
         if (this instanceof IEntity && (this != parseEntity)) {
@@ -47,7 +37,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
                 throw new RuntimeException("CacheEntry[" + this.ref() + "]不能被PropertyCopy", e);
             }
         }
-        return new CacheMirror(this, mirror);
+        return new CacheMirror(this, mirror, dbState);
     }
 
     /**
@@ -63,7 +53,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	 */
 	public void delete() {
 		Preconditions.checkNotNull(this.ref());
-		this.ref().delete(this);
+		this.ref().deleteEntry(this);
 	}
 
 	/**
@@ -76,34 +66,19 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	public abstract IEntity parseEntity();
 
 	/**
-	 * 修改Entry状态且不为P的时候发送给更新队列
-	 * 
-	 * @param dbState
-	 *            <font color=red>如果为P，则不发送到更新队列</font>
-	 */
-	protected void changeDbState(DBState dbState) {
-		setDbState(dbState);
-
-        // 这里只修改状态，不发送到queue了
-		/*if (DBState.P != dbState) {
-			ConcurrentCache.getInstance().sendToPersistQueue(this);
-		}*/
-	}
-
-	/**
 	 * 由子类覆盖
 	 * 
 	 * @return
 	 */
-	protected String dbUID() {
+	public String dbKey() {
 		return null;
 	}
 
 	/**
-	 * 唯一标识的数值 1.子类覆写 {@link #dbUID()} 2.子类实现标识注解ID在字段上
+	 * 唯一标识的数值 1.子类覆写 {@link #dbKey()} 2.子类实现标识注解ID在字段上
 	 */
 	public String getID() {
-		String uid = dbUID();
+		String uid = dbKey();
 		if (StringUtils.isNotBlank(uid)) {
 			return ref().getAttachedKey() + "`" + uid;
 		}
@@ -115,22 +90,6 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
 	/*
 	 * ==================== getter and setter ===================
 	 */
-
-	public DBState getDbState() {
-		return dbState;
-	}
-
-	synchronized void setDbState(DBState dbState) {
-		this.dbState = dbState;
-	}
-
-    public int getVersion() {
-        return version;
-    }
-
-    synchronized void setVersion(int version) {
-        this.version = version;
-    }
 
     public AbsReference ref() {
 		return super.getQueueEntry();
