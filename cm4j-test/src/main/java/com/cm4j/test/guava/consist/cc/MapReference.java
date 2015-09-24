@@ -88,7 +88,7 @@ public class MapReference<K, V extends CacheEntry> extends AbsReference {
     }
 
     @Override
-    public Set<CacheEntry> getNotDeletedSet() {
+    public Set<CacheEntry> getAllEntries() {
         return new HashSet<CacheEntry>(map.values());
     }
 }

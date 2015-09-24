@@ -5,8 +5,6 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.cc.persist.DBState;
 import com.cm4j.test.guava.consist.entity.IEntity;
 import com.cm4j.test.guava.service.ServiceManager;
-import com.google.common.base.Function;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,13 +108,7 @@ public class DBPersistQueue {
                         try {
                             logger.debug(this.segment + ":批处理大小：{}", size);
                             persistNum += size;
-                            Collection<Object[]> transform = Collections2.transform(entries, new Function<CacheMirror, Object[]>() {
-                                @Override
-                                public Object[] apply(CacheMirror input) {
-                                    return new Object[]{input.getEntity(), input.getDbState()};
-                                }
-                            });
-                            batchPersistData(transform);
+                            batchPersistData(entries);
                         } catch (Exception e) {
                             logger.error(this.segment + ":缓存批处理异常", e);
                         }
@@ -138,12 +130,12 @@ public class DBPersistQueue {
      * 批处理写入数据
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public void batchPersistData(Collection<Object[]> entities) {
+    public void batchPersistData(Collection<CacheMirror> entities) {
         try {
-            for (Object[] entry : entities) {
+            for (CacheMirror entry : entities) {
                 try {
-                    IEntity e = (IEntity) entry[0];
-                    DBState dbState = (DBState) entry[1];
+                    IEntity e = entry.getEntity();
+                    DBState dbState = entry.getDbState();
                     if (DBState.U == dbState) {
                         try {
                             // 这里之前报DataIntegrityViolationException

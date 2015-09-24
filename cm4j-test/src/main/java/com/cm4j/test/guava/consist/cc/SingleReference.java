@@ -42,7 +42,7 @@ public class SingleReference<V extends CacheEntry> extends AbsReference {
     }
 
     @Override
-    public Set<CacheEntry> getNotDeletedSet() {
+    public Set<CacheEntry> getAllEntries() {
         HashSet<CacheEntry> set = Sets.newHashSet();
         if (this.v != null) {
             set.add(this.v);

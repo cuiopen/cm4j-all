@@ -28,8 +28,7 @@ public class SingleTest {
             tmpFhhd.setNCurToken(11);
             tmpFhhd.update();
         }
-        ref.delete();
-        ref.persistAndRemove();
+        ref.persist();
     }
 
     @Test

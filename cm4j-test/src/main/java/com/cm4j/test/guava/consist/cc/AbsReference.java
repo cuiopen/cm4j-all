@@ -35,11 +35,10 @@ public abstract class AbsReference {
      *
      * @return
      */
-    protected abstract Set<CacheEntry> getNotDeletedSet();
+    protected abstract Set<CacheEntry> getAllEntries();
 
     /**
-     * 更新entry<br>
-     * 因为子类有范型，类型兼容问题，所以子类多写一个update()方法来规定对象给外部调用，而此方法也转类型调用update()
+     * 更新entry，在锁下执行
      *
      * @param e
      */
@@ -48,6 +47,7 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry entry, AbsReference ref) {
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref==null或与缓存中不一致，maybe缓存重新加载了ref");
                 _update(e);
                 changeDbState(e, DBState.U);
                 return null;
@@ -68,6 +68,7 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry hashEntry, AbsReference ref) {
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref==null或与缓存中不一致，maybe缓存重新加载了ref");
                 _delete(e);
                 changeDbState(e, DBState.D);
                 return null;
@@ -95,7 +96,6 @@ public abstract class AbsReference {
     }
 
     protected void doUnderLock(CCUtils.SegmentLockHandler handler) {
-        // todo 有没有必要判断当前ref与缓存内的ref是同一个？
         ConcurrentCache.getInstance().doUnderLock(this.attachedKey, handler);
     }
 
@@ -133,7 +133,7 @@ public abstract class AbsReference {
     protected void setAttachedKey(String attachedKey) {
         this.attachedKey = attachedKey;
 
-        for (CacheEntry e : getNotDeletedSet()) {
+        for (CacheEntry e : getAllEntries()) {
             e.resetRef(this);
         }
     }

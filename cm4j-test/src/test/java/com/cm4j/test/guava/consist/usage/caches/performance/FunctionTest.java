@@ -14,6 +14,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -72,22 +73,21 @@ public class FunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 200000; i++) { // 执行20000次
+                for (int i = 0; i < 1000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
-                        int random = RandomUtils.nextInt(1000);
+                        int random = RandomUtils.nextInt(3000);
 
+                        // 这一段要放在锁内，否则多线程获取ref，另一个线程remove缓存，则当前线程的ref就过期了。
                         synchronized (lock) {
-                            // 这一段要放在锁内，否则多线程获取ref，另一个线程remove缓存，则当前线程的ref就过期了。
                             SingleReference<TmpFhhd> ref = new TmpFhhdCache(random).ref();
-
                             TmpFhhd fhhd = ref.get();
                             if (fhhd == null) {
                                 ref.update(new TmpFhhd(random, 1, 1, ""));
 
                                 // 直接persist需注释
 //                                ref.persistAndRemove();
-//                                ref.persist();
+                                //ref.persist();
 
                                 // 计数器放在最下面，保证上面执行成功后再计数
                                 counter.incrementAndGet();
@@ -112,7 +112,7 @@ public class FunctionTest {
                         }
 
                         // 为增加并发异常，暂停10ms
-                        // Thread.sleep(10);
+                        TimeUnit.MILLISECONDS.sleep(1);
                     } catch (Exception e) {
                         logger.error("THREAD ERROR[" + Thread.currentThread().getName() + "]", e);
                     }

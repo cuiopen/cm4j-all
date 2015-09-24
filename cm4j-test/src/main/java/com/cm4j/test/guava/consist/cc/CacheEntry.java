@@ -37,7 +37,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
                 throw new RuntimeException("CacheEntry[" + this.ref() + "]不能被PropertyCopy", e);
             }
         }
-        return new CacheMirror(this, mirror, dbState);
+        return new CacheMirror(mirror, dbState);
     }
 
     /**

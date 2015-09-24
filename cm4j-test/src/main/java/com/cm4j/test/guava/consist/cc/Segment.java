@@ -250,13 +250,15 @@ final class Segment extends ReentrantLock implements Serializable {
                 AbsReference ref = e.getQueueEntry();
                 if (ref != null) {
                     // 数据保存
-                    Collection<PersistValue> values = ref.getPersistMap().values();
+                    Map<String, PersistValue> persistMap = ref.getPersistMap();
+                    Collection<PersistValue> values = persistMap.values();
                     if (!values.isEmpty()) {
-                        ArrayList<Object[]> objs = Lists.newArrayList();
+                        ArrayList<CacheMirror> objs = Lists.newArrayList();
                         for (PersistValue value : values) {
-                            objs.add(new Object[]{value.getEntry().parseEntity(), value.getDbState()});
+                            objs.add(value.getEntry().mirror(value.getDbState()));
                         }
                         this.persistQueue.batchPersistData(objs);
+                        persistMap.clear();
                     }
                 }
                 if (isRemove) {
@@ -293,6 +295,7 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
+    @Deprecated
     void rehash() {
         StopWatch watch = new Slf4JStopWatch();
         AtomicReferenceArray<HashEntry> oldTable = table;
@@ -352,8 +355,6 @@ final class Segment extends ReentrantLock implements Serializable {
         watch.stop("rehash()完成");
     }
 
-
-
     // expiration，过期相关业务
 
     /**
@@ -380,8 +381,10 @@ final class Segment extends ReentrantLock implements Serializable {
 
             while ((e = accessQueue.poll()) != null) {
                 Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
-                this.persistQueue.sendToPersistQueue(persistMap.values());
-                persistMap.clear();
+                if (!persistMap.isEmpty()) {
+                    this.persistQueue.sendToPersistQueue(persistMap.values());
+                    persistMap.clear();
+                }
             }
         } finally {
             unlock();
@@ -399,7 +402,10 @@ final class Segment extends ReentrantLock implements Serializable {
 
             // 发送当前数据到persistQueue
             Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
-            this.persistQueue.sendToPersistQueue(persistMap.values());
+            if (!persistMap.isEmpty()) {
+                this.persistQueue.sendToPersistQueue(persistMap.values());
+                persistMap.clear();
+            }
 
             // 移除entry
             // 这里会移除accessQueue，所以上面用peek而不是poll
@@ -437,9 +443,8 @@ final class Segment extends ReentrantLock implements Serializable {
     }
 
     HashEntry removeEntryFromChain(HashEntry first, HashEntry entry) {
-        if (!accessQueue.contains(entry)) {
-            throw new RuntimeException("被移除数据不在accessQueue中,key:" + entry.getKey());
-        }
+        Preconditions.checkArgument(accessQueue.contains(entry),"被移除数据不在accessQueue中,key:" + entry.getKey());
+
         HashEntry newFirst = entry.getNext();
         // 从链条1的头节点first开始迭代到需要删除的节点entry
         for (HashEntry e = first; e != entry; e = e.getNext()) {

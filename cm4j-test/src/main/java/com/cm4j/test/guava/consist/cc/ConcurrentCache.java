@@ -10,7 +10,6 @@ import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -255,24 +254,6 @@ public class ConcurrentCache {
     void doUnderLock(final String cacheKey,CCUtils.SegmentLockHandler handler) {
         int hash = CCUtils.rehash(cacheKey.hashCode());
         segmentFor(hash).doInSegmentUnderLock(cacheKey, hash, handler);
-    }
-
-	/* ---------------- expiration ---------------- */
-
-    private boolean isExpired(HashEntry entry, long now) {
-        if (now - entry.getAccessTime() > Constants.expireAfterAccessNanos) {
-            return true;
-        }
-        return false;
-    }
-
-    /*
-     * ================== utils =====================
-	 */
-
-    void persistImmediately(String key, Collection<CacheEntry> del, Collection<CacheEntry> up) {
-        int hash = CCUtils.rehash(key.hashCode());
-        // segmentFor(hash).getPersistQueue().persistImmediately(del,up);
     }
 
     // 缓存关闭标识
