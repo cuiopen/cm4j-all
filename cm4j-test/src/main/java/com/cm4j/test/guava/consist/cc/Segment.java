@@ -5,16 +5,14 @@ import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -246,25 +244,29 @@ final class Segment extends ReentrantLock implements Serializable {
         try {
             HashEntry e = getEntry(key, hash);
 
-            if (e != null) {
-                AbsReference ref = e.getQueueEntry();
-                if (ref != null) {
-                    // 数据保存
-                    Map<String, PersistValue> persistMap = ref.getPersistMap();
-                    Collection<PersistValue> values = persistMap.values();
-                    if (!values.isEmpty()) {
-                        ArrayList<CacheMirror> objs = Lists.newArrayList();
-                        for (PersistValue value : values) {
-                            objs.add(value.getEntry().mirror(value.getDbState()));
-                        }
-                        this.persistQueue.batchPersistData(objs);
-                        persistMap.clear();
+            // todo 缓存中没有对象，存储persistQueue的数据 ? 如何保存？
+            Preconditions.checkNotNull(e, "缓存中无对象，无法执行persistAndRemove");
+
+            // 缓存中有对象
+            AbsReference ref = e.getQueueEntry();
+            // 缓存中有，存储缓存中的数据
+            if (ref != null) {
+                // 数据保存
+                Map<String, PersistValue> persistMap = ref.getPersistMap();
+                Collection<PersistValue> values = persistMap.values();
+                if (!values.isEmpty()) {
+                    ArrayList<CacheMirror> objs = Lists.newArrayList();
+                    Map<String,CacheMirror> mirrors = Maps.newHashMap();
+                    for (PersistValue value : values) {
+                        mirrors.put(value.getEntry().getID(), value.getEntry().mirror(value.getDbState()));
                     }
+                    this.persistQueue.persistImmediatly(mirrors);
+                    persistMap.clear();
                 }
-                if (isRemove) {
-                    // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
-                    removeEntry(e, hash);
-                }
+            }
+            if (isRemove) {
+                // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
+                removeEntry(e, hash);
             }
         } finally {
             unlock();
@@ -367,6 +369,8 @@ final class Segment extends ReentrantLock implements Serializable {
             } finally {
                 unlock();
             }
+        } else {
+            logger.error("tryLock failed,can not tryExpireEntries...");
         }
     }
 
@@ -377,9 +381,10 @@ final class Segment extends ReentrantLock implements Serializable {
         lock();
         try{
             drainRecencyQueue();
-            HashEntry e;
 
-            while ((e = accessQueue.poll()) != null) {
+            Iterator<HashEntry> iterator = accessQueue.iterator();
+            while (iterator.hasNext()) {
+                HashEntry e = iterator.next();
                 Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
                 if (!persistMap.isEmpty()) {
                     this.persistQueue.sendToPersistQueue(persistMap.values());
@@ -403,7 +408,17 @@ final class Segment extends ReentrantLock implements Serializable {
             // 发送当前数据到persistQueue
             Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
             if (!persistMap.isEmpty()) {
+                // todo 为什么 立即存储OK，但发送队列就数据不一致了呢？？？
+                // 有问题啊。你这里发送db然后清除了，但是还没保存db啊。这时候重新加载数据肯定不一致。。。我超
                 this.persistQueue.sendToPersistQueue(persistMap.values());
+
+                // 立即存储
+                /*ArrayList<CacheMirror> objs = Lists.newArrayList();
+                for (PersistValue value : persistMap.values()) {
+                    objs.add(value.getEntry().mirror(value.getDbState()));
+                }
+                this.persistQueue.batchPersistData(objs);*/
+
                 persistMap.clear();
             }
 

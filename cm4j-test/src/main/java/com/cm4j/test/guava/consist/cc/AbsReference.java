@@ -47,7 +47,7 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry entry, AbsReference ref) {
-                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref==null或与缓存中不一致，maybe缓存重新加载了ref");
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref为空或与缓存中不一致[可能缓存过期或重新加载]");
                 _update(e);
                 changeDbState(e, DBState.U);
                 return null;
@@ -68,12 +68,21 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry hashEntry, AbsReference ref) {
-                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref==null或与缓存中不一致，maybe缓存重新加载了ref");
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref为空或与缓存中不一致[可能缓存过期或重新加载]");
                 _delete(e);
                 changeDbState(e, DBState.D);
                 return null;
             }
         });
+    }
+
+    /**
+     * 是否已全部保存
+     *
+     * @return
+     */
+    public boolean isAllPersist() {
+        return this.persistMap.isEmpty();
     }
 
     protected abstract void _delete(CacheEntry e);

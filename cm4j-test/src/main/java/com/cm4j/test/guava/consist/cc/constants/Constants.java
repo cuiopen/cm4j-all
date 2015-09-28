@@ -19,11 +19,11 @@ public class Constants {
     public static final int RETRIES_BEFORE_LOCK = 2;
 
     // TODO 默认过期纳秒，完成时需更改为较长时间过期，过短调试的时候可能会报缓存过期不存在
-    public static final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(30);
+    public static final long expireAfterAccessNanos = TimeUnit.MILLISECONDS.toNanos(2000);
     /**
      * TODO 更新队列检测间隔，单位s
      */
-    public static final int CHECK_UPDATE_QUEUE_INTERVAL = 10;
+    public static final int CHECK_UPDATE_QUEUE_INTERVAL = 5;
     /**
      * 间隔多少次检查，可持久化，总间隔时间也就是 5 * 60s = 5min
      */
@@ -31,7 +31,7 @@ public class Constants {
     /**
      * 达到多少个对象，可持久化
      */
-    public static final int MAX_UNITS_IN_UPDATE_QUEUE = 50000;
+    public static final int MAX_UNITS_IN_UPDATE_QUEUE = 0;
     /**
      * 达到多少条则提交给批处理
      */

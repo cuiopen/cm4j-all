@@ -13,6 +13,7 @@ import org.springframework.dao.DataAccessException;
 import javax.validation.ConstraintViolationException;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -29,7 +30,9 @@ public class DBPersistQueue {
     private final Segment segment;
 
     private final ConcurrentHashMap<String, CacheMirror> map;
-    // 写入锁[persistAndRemove需要用到写入锁]
+    // 写入锁
+    // 1.防止多个线程同时执行persist  todo 应该可以多线程读取???? 存在主要是为了原因2
+    // 2.[persistAndRemove需要用到写入锁]
     private final Lock writeLock = new ReentrantLock();
     /**
      * 更新队列消费计数器
@@ -70,6 +73,23 @@ public class DBPersistQueue {
         }
 
         return result;
+    }
+
+    /**
+     * 立即存储 [persistAndRemove使用]
+     * @param mirrorMap
+     */
+    public void persistImmediatly(Map<String,CacheMirror> mirrorMap) {
+        writeLock.lock();
+        try {
+            // 从map移除key
+            for (String key : mirrorMap.keySet()) {
+                this.map.remove(key);
+            }
+            batchPersistData(mirrorMap.values());
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     /**

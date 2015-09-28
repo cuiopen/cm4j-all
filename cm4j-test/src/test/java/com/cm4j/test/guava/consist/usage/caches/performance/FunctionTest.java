@@ -20,6 +20,10 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * 多线程异步短时间过期+写入测试
  *
+ * TRUNCATE `tmp_fhhd`;
+ *
+ * SELECT SUM(`n_cur_token`) FROM `tmp_fhhd`;
+ *
  * @author Yang.hao
  * @since 2013-3-6 上午10:12:38
  */
@@ -76,7 +80,7 @@ public class FunctionTest {
                 for (int i = 0; i < 1000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
-                        int random = RandomUtils.nextInt(3000);
+                        int random = RandomUtils.nextInt(300);
 
                         // 这一段要放在锁内，否则多线程获取ref，另一个线程remove缓存，则当前线程的ref就过期了。
                         synchronized (lock) {
@@ -84,10 +88,6 @@ public class FunctionTest {
                             TmpFhhd fhhd = ref.get();
                             if (fhhd == null) {
                                 ref.update(new TmpFhhd(random, 1, 1, ""));
-
-                                // 直接persist需注释
-//                                ref.persistAndRemove();
-                                //ref.persist();
 
                                 // 计数器放在最下面，保证上面执行成功后再计数
                                 counter.incrementAndGet();
@@ -97,10 +97,6 @@ public class FunctionTest {
                                     fhhd.increaseValue();
                                     fhhd.update();
 
-                                    // 数据不一致，貌似是因为 缓存remove不是现场安全的，
-                                    // remove后另一个线程获取的还是之前的ref
-                                     // ref.persistAndRemove();
-
                                     counter.incrementAndGet();
                                 } else {
                                     // logger.debug("{} deleted", ref);
@@ -109,6 +105,11 @@ public class FunctionTest {
                                     counter.addAndGet(-fhhd.getNCurToken());
                                 }
                             }
+
+                            /*double v = RandomUtils.nextDouble();
+                            if (v > 0.8) {
+                                ref.persistAndRemove();
+                            }*/
                         }
 
                         // 为增加并发异常，暂停10ms

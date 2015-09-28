@@ -23,11 +23,24 @@ public class SingleTest {
         SingleReference<TmpFhhd> ref = new TmpFhhdCache(50769).ref();
         TmpFhhd tmpFhhd = ref.get();
         if (tmpFhhd == null) {
-            ref.update(new TmpFhhd(50769, 10, 10, ""));
+            tmpFhhd = new TmpFhhd(50769, 10, 10, "");
+            ref.update(tmpFhhd);
         } else {
             tmpFhhd.setNCurToken(11);
             tmpFhhd.update();
         }
+
+        TmpFhhd tmpFhhd1 = new TmpFhhdCache(50769).ref().get();
+        tmpFhhd1.setNCurToken(12);
+        tmpFhhd1.update();
+
+        TmpFhhd tmpFhhd2 = new TmpFhhdCache(50769).ref().get();
+        tmpFhhd2.setNCurToken(13);
+        tmpFhhd2.update();
+
+        // 另一个线程导致过期
+        new TmpFhhdCache(1).ref();
+
         ref.persist();
     }
 
