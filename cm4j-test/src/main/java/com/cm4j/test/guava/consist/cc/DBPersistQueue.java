@@ -104,54 +104,57 @@ public class DBPersistQueue {
      * @param doNow 是否立即写入
      */
     public void consumePersistQueue(boolean doNow) {
-        int persistNum = 0;
+        try {
+            int persistNum = 0;
 
-        long currentCounter = counter++;
-        int queueSize = map.size();
-        logger.error(this.segment + ":定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queueSize, doNow});
-        if (doNow || queueSize >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || (currentCounter) % Constants.PERSIST_CHECK_INTERVAL == 0) {
+            long currentCounter = counter++;
+            int queueSize = map.size();
+            logger.error(this.segment + ":定时[{}]检测：缓存存储数据队列大小：[{}]，doNow：[{}]", new Object[]{currentCounter, queueSize, doNow});
+            if (doNow || queueSize >= Constants.MAX_UNITS_IN_UPDATE_QUEUE || currentCounter % Constants.PERSIST_CHECK_INTERVAL == 0) {
+                while (true) {
+                    Set<CacheMirror> entries;
 
-            Set<CacheMirror> entries;
-            while (true) {
-                writeLock.lock();
+                    writeLock.lock();
+                    try {
+                        entries = drain(Constants.BATCH_TO_COMMIT);
+                        int size;
+                        if ((size = entries.size()) == 0) {
+                            logger.error("{}:定时[{}]检测结束，queue内无数据", this.segment, currentCounter);
+                            break;
+                        }
 
-                try {
-                    entries = drain(Constants.BATCH_TO_COMMIT);
-                    int size;
-                    if ((size = entries.size()) == 0) {
-                        logger.error("{}:定时[{}]检测结束，queue内无数据", this.segment, currentCounter);
+                        logger.debug("{}:缓存存储数据开始，size：{}", this.segment, size);
+
+                        if (entries.size() > 0) {
+                            try {
+                                logger.debug(this.segment + ":批处理大小：{}", size);
+                                persistNum += size;
+                                batchPersistData(entries);
+                            } catch (Exception e) {
+                                logger.error(this.segment + ":缓存批处理异常", e);
+                            }
+                        }
+                    } finally {
+                        writeLock.unlock();
+                    }
+
+                    // 放在writeLock外面
+                    // 1.防止writeLock与Segment锁嵌套
+                    // 2.这样就有可能保存DB之后，再去移除persistMap间隔中，对象又被修改了。所以removeAfterPersist()比比对版本号
+                    for (CacheMirror mirror : entries) {
+                        ConcurrentCache.getInstance().removeAfterPersist(mirror);
+                    }
+
+                    if (entries.size() < Constants.BATCH_TO_COMMIT) {
+                        logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
                         break;
                     }
-
-                    logger.debug(this.segment + ":缓存存储数据开始，size：" + size);
-
-                    if (entries.size() > 0) {
-                        try {
-                            logger.debug(this.segment + ":批处理大小：{}", size);
-                            persistNum += size;
-                            batchPersistData(entries);
-                        } catch (Exception e) {
-                            logger.error(this.segment + ":缓存批处理异常", e);
-                        }
-                    }
-                } finally {
-                    writeLock.unlock();
-                }
-
-                // 放在writeLock外面
-                // 1.防止writeLock与Segment锁嵌套
-                // 2.这样就有可能保存DB之后，再去移除persistMap间隔中，对象又被修改了。所以removeAfterPersist()比比对版本号
-                for (CacheMirror mirror : entries) {
-                    ConcurrentCache.getInstance().removeAfterPersist(mirror);
-                }
-
-                if (entries.size() < Constants.BATCH_TO_COMMIT) {
-                    logger.error(this.segment + ":定时[{}]检测结束，数量不足退出", currentCounter);
-                    break;
                 }
             }
+            logger.error(this.segment + ":定时[{}]检测结束，本次存储大小为{}", currentCounter, persistNum);
+        } catch (Exception e) {
+            logger.error("consumePersistQueue error", e);
         }
-        logger.error(this.segment + ":定时[{}]检测结束，本次存储大小为{}", currentCounter, persistNum);
     }
 
     /**

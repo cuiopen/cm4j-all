@@ -97,7 +97,7 @@ public class ConcurrentCache {
         // 定时处理器
         service = Executors.newScheduledThreadPool(segments.length);
         for (final Segment segment : segments) {
-            service.scheduleAtFixedRate(new Runnable() {
+            service.scheduleWithFixedDelay(new Runnable() {
                 @Override
                 public void run() {
                     segment.getPersistQueue().consumePersistQueue(false);
@@ -270,9 +270,13 @@ public class ConcurrentCache {
                     String dbKey = mirror.getDbKey();
                     PersistValue persistValue = persistMap.get(dbKey);
                     // 需比对版本号，以防止其他线程修改了此对象
-                    if (persistValue != null && persistValue.getVersion() == mirror.getVersion()) {
+                    if (persistValue != null && mirror.getVersion() == persistValue.getVersion()) {
                         persistMap.remove(dbKey);
                     }
+                    /*else {
+                        logger.debug("persistValue[{}] is null or version[{},{}] is not match",
+                                new Object[]{persistValue == null ? null : persistValue.getEntry().getID(), mirror.getVersion(), persistValue.getVersion()});
+                    }*/
                 }
                 return null;
             }
