@@ -21,7 +21,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
      * 放入队列时
      * 需要把当前状态和数据做一个镜像备份，保存db时就用备份数据，这样不会出现当前数据更改了，影响到保存DB的数据
      */
-    public CacheMirror mirror(DBState dbState) {
+    public CacheMirror mirror(DBState dbState, int version) {
         IEntity mirror = null;
         IEntity parseEntity = this.parseEntity();
         if (this instanceof IEntity && (this != parseEntity)) {
@@ -37,7 +37,7 @@ public abstract class CacheEntry extends FIFOEntry<AbsReference> {
                 throw new RuntimeException("CacheEntry[" + this.ref() + "]不能被PropertyCopy", e);
             }
         }
-        return new CacheMirror(mirror, dbState);
+        return new CacheMirror(ref().getAttachedKey(), dbKey(), version, mirror, dbState);
     }
 
     /**

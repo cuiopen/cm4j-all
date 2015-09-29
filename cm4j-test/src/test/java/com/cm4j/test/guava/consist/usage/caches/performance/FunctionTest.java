@@ -77,7 +77,7 @@ public class FunctionTest {
         public void run() {
             try {
                 barrier.await();
-                for (int i = 0; i < 1000; i++) { // 执行20000次
+                for (int i = 0; i < 5000; i++) { // 执行20000次
                     try {
                         // 这里数值越大，代表数据量越大，持久化对象越多
                         int random = RandomUtils.nextInt(300);
@@ -99,7 +99,6 @@ public class FunctionTest {
 
                                     counter.incrementAndGet();
                                 } else {
-                                    // logger.debug("{} deleted", ref);
                                     fhhd.delete();
 
                                     counter.addAndGet(-fhhd.getNCurToken());
@@ -112,8 +111,8 @@ public class FunctionTest {
                             }*/
                         }
 
-                        // 为增加并发异常，暂停10ms
-                        TimeUnit.MILLISECONDS.sleep(1);
+                        // 为增加并发异常，暂停10ms，注意：性能测试要关闭这个
+                         TimeUnit.MILLISECONDS.sleep(10);
                     } catch (Exception e) {
                         logger.error("THREAD ERROR[" + Thread.currentThread().getName() + "]", e);
                     }

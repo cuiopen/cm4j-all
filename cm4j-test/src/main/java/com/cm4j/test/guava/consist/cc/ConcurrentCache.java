@@ -10,6 +10,7 @@ import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -254,6 +255,28 @@ public class ConcurrentCache {
     void doUnderLock(final String cacheKey,CCUtils.SegmentLockHandler handler) {
         int hash = CCUtils.rehash(cacheKey.hashCode());
         segmentFor(hash).doInSegmentUnderLock(cacheKey, hash, handler);
+    }
+
+    /**
+     * 缓存保存之后需要从persistMap中移除此对象
+     * @param mirror
+     */
+    void removeAfterPersist(final CacheMirror mirror) {
+        doUnderLock(mirror.getCacheKey(), new CCUtils.SegmentLockHandler() {
+            @Override
+            public Object doInSegmentUnderLock(Segment segment, HashEntry e, AbsReference ref) {
+                if (ref != null) {
+                    Map<String, PersistValue> persistMap = ref.getPersistMap();
+                    String dbKey = mirror.getDbKey();
+                    PersistValue persistValue = persistMap.get(dbKey);
+                    // 需比对版本号，以防止其他线程修改了此对象
+                    if (persistValue != null && persistValue.getVersion() == mirror.getVersion()) {
+                        persistMap.remove(dbKey);
+                    }
+                }
+                return null;
+            }
+        });
     }
 
     // 缓存关闭标识

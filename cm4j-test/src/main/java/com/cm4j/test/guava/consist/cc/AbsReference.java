@@ -47,7 +47,8 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry entry, AbsReference ref) {
-                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref为空或与缓存中不一致[可能缓存过期或重新加载]");
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this,
+                        "ref为空或与缓存中不一致[可能缓存过期或重新加载]:" + (ref == null ? "" : ref.getAttachedKey()));
                 _update(e);
                 changeDbState(e, DBState.U);
                 return null;
@@ -68,7 +69,8 @@ public abstract class AbsReference {
         doUnderLock(new CCUtils.SegmentLockHandler() {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry hashEntry, AbsReference ref) {
-                Preconditions.checkArgument(ref != null && ref == AbsReference.this, "ref为空或与缓存中不一致[可能缓存过期或重新加载]");
+                Preconditions.checkArgument(ref != null && ref == AbsReference.this,
+                        "ref为空或与缓存中不一致[可能缓存过期或重新加载]:" + (ref == null ? "" : ref.getAttachedKey()));
                 _delete(e);
                 changeDbState(e, DBState.D);
                 return null;

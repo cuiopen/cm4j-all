@@ -47,7 +47,7 @@ public class DBPersistQueue {
 
     public void sendToPersistQueue(Collection<PersistValue> values) {
         for (PersistValue value : values) {
-            CacheMirror mirror = value.getEntry().mirror(value.getDbState());
+            CacheMirror mirror = value.getEntry().mirror(value.getDbState(), value.getVersion());
             map.put(value.getEntry().getID(), mirror);
         }
     }
@@ -77,9 +77,10 @@ public class DBPersistQueue {
 
     /**
      * 立即存储 [persistAndRemove使用]
+     *
      * @param mirrorMap
      */
-    public void persistImmediatly(Map<String,CacheMirror> mirrorMap) {
+    public void persistImmediatly(Map<String, CacheMirror> mirrorMap) {
         writeLock.lock();
         try {
             // 从map移除key
@@ -114,16 +115,16 @@ public class DBPersistQueue {
             while (true) {
                 writeLock.lock();
 
-                entries = drain(Constants.BATCH_TO_COMMIT);
-                int size;
-                if ((size = entries.size()) == 0) {
-                    logger.error("{}:定时[{}]检测结束，queue内无数据", this.segment, currentCounter);
-                    break;
-                }
-
-                logger.debug(this.segment + ":缓存存储数据开始，size：" + map.size());
-
                 try {
+                    entries = drain(Constants.BATCH_TO_COMMIT);
+                    int size;
+                    if ((size = entries.size()) == 0) {
+                        logger.error("{}:定时[{}]检测结束，queue内无数据", this.segment, currentCounter);
+                        break;
+                    }
+
+                    logger.debug(this.segment + ":缓存存储数据开始，size：" + size);
+
                     if (entries.size() > 0) {
                         try {
                             logger.debug(this.segment + ":批处理大小：{}", size);
@@ -135,6 +136,13 @@ public class DBPersistQueue {
                     }
                 } finally {
                     writeLock.unlock();
+                }
+
+                // 放在writeLock外面
+                // 1.防止writeLock与Segment锁嵌套
+                // 2.这样就有可能保存DB之后，再去移除persistMap间隔中，对象又被修改了。所以removeAfterPersist()比比对版本号
+                for (CacheMirror mirror : entries) {
+                    ConcurrentCache.getInstance().removeAfterPersist(mirror);
                 }
 
                 if (entries.size() < Constants.BATCH_TO_COMMIT) {

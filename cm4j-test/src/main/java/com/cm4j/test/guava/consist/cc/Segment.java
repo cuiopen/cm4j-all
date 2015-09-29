@@ -4,7 +4,6 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
@@ -12,7 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -72,29 +74,25 @@ final class Segment extends ReentrantLock implements Serializable {
         return null;
     }
 
-    AbsReference getLiveValue(String key, int hash, long now) {
-        HashEntry e = getLiveEntry(key, hash, now);
-        if (e != null) {
-            return e.getQueueEntry();
-        }
-        return null;
+    AbsReference getLiveValue(HashEntry e, long now) {
+        HashEntry _e = getLiveEntry(e, now);
+        return _e == null ? null : _e.getQueueEntry();
     }
 
     /**
      * 查找存活的Entry，包含Persist检测
      *
-     * @param key
-     * @param hash
+     * @param e
      * @param now
      * @return
      */
-    HashEntry getLiveEntry(String key, int hash, long now) {
-        HashEntry e = getEntry(key, hash);
+    HashEntry getLiveEntry(HashEntry e, long now) {
         if (e == null) {
             return null;
         } else if (isExpired(e, now)) {
             // 如果状态不是P，则会延迟生命周期
             tryExpireEntries(now);
+            // 非精准查询，如果延长生命周期，这里依然返回null，get()调用时需在有锁情况下做二次检测
             return null;
         }
         return e;
@@ -110,7 +108,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 HashEntry e = getEntry(key, hash);
                 if (e != null) {
                     // 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
-                    AbsReference value = getLiveValue(key, hash, CCUtils.now());
+                    AbsReference value = getLiveValue(e, CCUtils.now());
                     if (value != null) {
                         watch.lap("get.缓存获取到");
                         recordAccess(e);
@@ -152,7 +150,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 if (e.getHash() == hash && entryKey != null && entryKey.equals(key)) {
                     ref = e.getQueueEntry();
 
-                    if (ref != null && !isExpired(e, now)) {
+                    if (ref != null && !(isExpired(e, now) && ref.isAllPersist())) {
                         recordAccess(e);
                         return ref;
                     }
@@ -182,8 +180,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
             lock();
             try {
-                HashEntry e = getLiveEntry(key, hash, now);
-                return e != null;
+                return getLiveEntry(getEntry(key, hash), now) != null;
             } finally {
                 unlock();
             }
@@ -199,7 +196,7 @@ final class Segment extends ReentrantLock implements Serializable {
 
             int c = count;
             if (c++ > threshold) { // ensure capacity
-                rehash();
+                expand();
             }
             // 为什么要创建tab指向table
             // 这是因为table变量是volatile类型，多次读取volatile类型的开销要比非volatile开销要大，而且编译器也无法优化
@@ -242,31 +239,32 @@ final class Segment extends ReentrantLock implements Serializable {
     void persistAndRemove(String key, int hash ,boolean isRemove) {
         lock();
         try {
+            // persistAndRemove()以缓存内对象为准，因为缓存内对象是最新的
+            // persistMap中有，则persistQueue也一定有
+            // 因为persistQueue执行完成之后，需要移除persistMap
+
             HashEntry e = getEntry(key, hash);
 
-            // todo 缓存中没有对象，存储persistQueue的数据 ? 如何保存？
-            Preconditions.checkNotNull(e, "缓存中无对象，无法执行persistAndRemove");
-
-            // 缓存中有对象
-            AbsReference ref = e.getQueueEntry();
-            // 缓存中有，存储缓存中的数据
-            if (ref != null) {
+            // 缓存中存在对象
+            AbsReference ref;
+            if (e != null && (ref = e.getQueueEntry()) != null) {
                 // 数据保存
                 Map<String, PersistValue> persistMap = ref.getPersistMap();
                 Collection<PersistValue> values = persistMap.values();
                 if (!values.isEmpty()) {
-                    ArrayList<CacheMirror> objs = Lists.newArrayList();
                     Map<String,CacheMirror> mirrors = Maps.newHashMap();
                     for (PersistValue value : values) {
-                        mirrors.put(value.getEntry().getID(), value.getEntry().mirror(value.getDbState()));
+                        mirrors.put(value.getEntry().getID(), value.getEntry().mirror(value.getDbState(), value.getVersion()));
                     }
                     this.persistQueue.persistImmediatly(mirrors);
+
+                    // 清空persistMap
                     persistMap.clear();
                 }
-            }
-            if (isRemove) {
-                // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
-                removeEntry(e, hash);
+                if (isRemove) {
+                    // 是否应该把里面所有元素的ref都设为null，这样里面元素则不能update
+                    removeEntry(e, hash);
+                }
             }
         } finally {
             unlock();
@@ -297,13 +295,17 @@ final class Segment extends ReentrantLock implements Serializable {
         }
     }
 
-    @Deprecated
-    void rehash() {
+    /**
+     * 扩容
+     */
+    void expand() {
         StopWatch watch = new Slf4JStopWatch();
         AtomicReferenceArray<HashEntry> oldTable = table;
         int oldCapacity = oldTable.length();
         if (oldCapacity >= Constants.MAXIMUM_CAPACITY)
             return;
+
+        logger.error("segment[{}] expand...", this);
 
         int newCount = count;
         AtomicReferenceArray<HashEntry> newTable = HashEntry.newArray(oldCapacity << 1);
@@ -345,6 +347,8 @@ final class Segment extends ReentrantLock implements Serializable {
                         if (newFirst != null) {
                             newTable.set(newIndex, newFirst);
                         } else {
+                            // todo 为什么要移除accessQueue ?
+                            // 貌似是因为 copyEntry可能返回null，因为e被回收了。 需要和源码进行比对
                             accessQueue.remove(e);
                             newCount--;
                         }
@@ -354,7 +358,7 @@ final class Segment extends ReentrantLock implements Serializable {
         }
         table = newTable;
         this.count = newCount;
-        watch.stop("rehash()完成");
+        watch.stop("expand()完成");
     }
 
     // expiration，过期相关业务
@@ -365,11 +369,46 @@ final class Segment extends ReentrantLock implements Serializable {
     void tryExpireEntries(long now) {
         if (tryLock()) {
             try {
-                expireEntries(now);
+                drainRecencyQueue();
+
+                // 如果缓存isExpire但是没有保存db，这时会不会死循环？
+                // 应该会的，因为peek每次都是获取的第一个。如果第一个没移除下次循环还是它，就死循环了
+                // 所以直接把缓存的生命周期后移，同时如果在遍历时再碰到此对象，则退出遍历
+                HashEntry e;
+                HashEntry firstEntry = null;
+                while ((e = accessQueue.peek()) != null && isExpired(e, now)) {
+                    if (firstEntry == null) {
+                        // 第一次循环，设置first
+                        firstEntry = e;
+                    } else if (e == firstEntry) {
+                        // 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
+                        break;
+                    }
+
+                    // accessQueue大小应该与count一致
+                    int accessQueueSize = accessQueue.size();
+                    Preconditions.checkArgument(accessQueueSize == count, "个数不一致：accessQueue:" + accessQueueSize + ",count:" + count);
+
+                    AbsReference ref = e.getQueueEntry();
+                    if (ref.isAllPersist()) {
+                        logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
+                        removeEntry(e, e.getHash());
+                    } else {
+                        // 延长有效期
+                        recordAccess(e);
+
+                        // 发送当前数据到persistQueue
+                        Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
+                        if (!persistMap.isEmpty()) {
+                            this.persistQueue.sendToPersistQueue(persistMap.values());
+                        }
+                    }
+                }
             } finally {
                 unlock();
             }
         } else {
+            // 有无锁的地方调此方法，比如说getLiveEntry()，如果此时有锁被占用，就走到这里
             logger.error("tryLock failed,can not tryExpireEntries...");
         }
     }
@@ -388,44 +427,10 @@ final class Segment extends ReentrantLock implements Serializable {
                 Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
                 if (!persistMap.isEmpty()) {
                     this.persistQueue.sendToPersistQueue(persistMap.values());
-                    persistMap.clear();
                 }
             }
         } finally {
             unlock();
-        }
-    }
-
-    // 调用方都有锁
-    void expireEntries(long now) {
-        drainRecencyQueue();
-
-        HashEntry e;
-        while ((e = accessQueue.peek()) != null && isExpired(e, now)) {
-            // accessQueue大小应该与count一致
-            Preconditions.checkArgument(accessQueue.size() == count, "个数不一致：accessQueue:" + accessQueue.size() + ",count:" + count);
-
-            // 发送当前数据到persistQueue
-            Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
-            if (!persistMap.isEmpty()) {
-                // todo 为什么 立即存储OK，但发送队列就数据不一致了呢？？？
-                // 有问题啊。你这里发送db然后清除了，但是还没保存db啊。这时候重新加载数据肯定不一致。。。我超
-                this.persistQueue.sendToPersistQueue(persistMap.values());
-
-                // 立即存储
-                /*ArrayList<CacheMirror> objs = Lists.newArrayList();
-                for (PersistValue value : persistMap.values()) {
-                    objs.add(value.getEntry().mirror(value.getDbState()));
-                }
-                this.persistQueue.batchPersistData(objs);*/
-
-                persistMap.clear();
-            }
-
-            // 移除entry
-            // 这里会移除accessQueue，所以上面用peek而不是poll
-            removeEntry(e, e.getHash());
-            logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), e.getQueueEntry()});
         }
     }
 
@@ -479,6 +484,7 @@ final class Segment extends ReentrantLock implements Serializable {
      * @return
      */
     HashEntry copyEntry(HashEntry original, HashEntry newNext) {
+        // todo 这个和源码不一样？  源码里面有返回null值
         HashEntry newEntry = new HashEntry(original.getKey(), original.getHash(), newNext, original.getQueueEntry());
         copyAccessEntry(original, newEntry);
         return newEntry;
