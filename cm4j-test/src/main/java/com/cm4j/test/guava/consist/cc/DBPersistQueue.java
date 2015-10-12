@@ -33,7 +33,7 @@ public class DBPersistQueue {
     // 写入锁
     // 1.防止多个线程同时执行persist  todo 应该可以多线程读取???? 存在主要是为了原因2
     // 2.[persistAndRemove需要用到写入锁]
-    private final Lock writeLock = new ReentrantLock();
+    private final Lock writeLock;
     /**
      * 更新队列消费计数器
      */
@@ -43,6 +43,7 @@ public class DBPersistQueue {
         this.segment = segment;
         map = new ConcurrentHashMap<String, CacheMirror>();
         hibernate = ServiceManager.getInstance().getSpringBean("hibernateDao");
+        writeLock = new ReentrantLock();
     }
 
     public void sendToPersistQueue(Collection<PersistValue> values) {

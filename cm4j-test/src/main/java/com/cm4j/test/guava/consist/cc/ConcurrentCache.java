@@ -6,7 +6,7 @@ import com.cm4j.test.guava.consist.loader.CacheLoader;
 import com.cm4j.test.guava.consist.loader.CacheValueLoader;
 import com.cm4j.test.guava.consist.loader.PrefixMappping;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
+import org.apache.commons.lang.time.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -272,6 +272,8 @@ public class ConcurrentCache {
                     // 需比对版本号，以防止其他线程修改了此对象
                     if (persistValue != null && mirror.getVersion() == persistValue.getVersion()) {
                         persistMap.remove(dbKey);
+                        logger.debug("persistValue[{}] is removed from persistMap",
+                                new Object[]{persistValue.getEntry().getID()});
                     }
                     /*else {
                         logger.debug("persistValue[{}] is null or version[{},{}] is not match",
@@ -291,10 +293,9 @@ public class ConcurrentCache {
      */
     public void stop() {
         logger.error("stop()启动，缓存被关闭，等待写入线程完成...");
-        Stopwatch watch = Stopwatch.createStarted();
+        StopWatch watch = new StopWatch();
+        watch.start();
         stop.set(true);
-
-        long now = System.currentTimeMillis();
 
         for (final Segment segment : segments) {
             service.submit(new Runnable() {
@@ -317,6 +318,6 @@ public class ConcurrentCache {
         }
 
         watch.stop();
-        logger.error("stop()运行时间:{}ms", watch.elapsed(TimeUnit.MILLISECONDS));
+        logger.error("stop()运行时间:{}ms", watch.getTime());
     }
 }

@@ -4,6 +4,7 @@ import com.cm4j.test.guava.consist.cc.constants.Constants;
 import com.cm4j.test.guava.consist.fifo.FIFOAccessQueue;
 import com.cm4j.test.guava.consist.loader.CacheDefiniens;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.perf4j.StopWatch;
 import org.perf4j.slf4j.Slf4JStopWatch;
@@ -11,10 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -74,9 +72,16 @@ final class Segment extends ReentrantLock implements Serializable {
         return null;
     }
 
-    AbsReference getLiveValue(HashEntry e, long now) {
-        HashEntry _e = getLiveEntry(e, now);
-        return _e == null ? null : _e.getQueueEntry();
+    AbsReference getNotExipredValue(HashEntry e, long now) {
+        // 直接返回未过期的对象
+        boolean expired = isExpired(e, now);
+        if (e != null && !expired) {
+            return e.getQueueEntry();
+        }
+        if (expired) {
+            tryExpireEntries(now);
+        }
+        return null;
     }
 
     /**
@@ -92,8 +97,9 @@ final class Segment extends ReentrantLock implements Serializable {
         } else if (isExpired(e, now)) {
             // 如果状态不是P，则会延迟生命周期
             tryExpireEntries(now);
-            // 非精准查询，如果延长生命周期，这里依然返回null，get()调用时需在有锁情况下做二次检测
-            return null;
+            if (e.getQueueEntry().isAllPersist()) {
+                return null;
+            }
         }
         return e;
     }
@@ -108,7 +114,7 @@ final class Segment extends ReentrantLock implements Serializable {
                 HashEntry e = getEntry(key, hash);
                 if (e != null) {
                     // 这里只是一次无锁情况的快速尝试查询，如果未查询到，会在有锁情况下再查一次
-                    AbsReference value = getLiveValue(e, CCUtils.now());
+                    AbsReference value = getNotExipredValue(e, CCUtils.now());
                     if (value != null) {
                         watch.lap("get.缓存获取到");
                         recordAccess(e);
@@ -155,7 +161,9 @@ final class Segment extends ReentrantLock implements Serializable {
                         return ref;
                     }
 
-                    // immediately reuse invalid entries
+                    // ref为空或者 过期全保存，会走到这里。[检测过后，到这里过期了。此时就会走到这里]
+                    // 这里移除不移除 accessQueue.remove(e) 都没关系，因为下面会重新put
+                    // TODO 但count对不对？？待测
                     accessQueue.remove(e);
                     this.count = newCount; // write-volatile
                     break;
@@ -176,11 +184,10 @@ final class Segment extends ReentrantLock implements Serializable {
 
     boolean containsKey(String key, int hash) {
         if (count != 0) { // read-volatile
-            long now = CCUtils.now();
 
             lock();
             try {
-                return getLiveEntry(getEntry(key, hash), now) != null;
+                return getLiveEntry(getEntry(key, hash), CCUtils.now()) != null;
             } finally {
                 unlock();
             }
@@ -371,17 +378,12 @@ final class Segment extends ReentrantLock implements Serializable {
             try {
                 drainRecencyQueue();
 
-                // 如果缓存isExpire但是没有保存db，这时会不会死循环？
-                // 应该会的，因为peek每次都是获取的第一个。如果第一个没移除下次循环还是它，就死循环了
-                // 所以直接把缓存的生命周期后移，同时如果在遍历时再碰到此对象，则退出遍历
-                HashEntry e;
-                HashEntry firstEntry = null;
-                while ((e = accessQueue.peek()) != null && isExpired(e, now)) {
-                    if (firstEntry == null) {
-                        // 第一次循环，设置first
-                        firstEntry = e;
-                    } else if (e == firstEntry) {
-                        // 第N此循环，又碰到e，代表已经完成了一次循环，这样可防止无限循环
+                List<HashEntry> toRemoved = Lists.newArrayList();
+                Iterator<HashEntry> iterator = accessQueue.iterator();
+                while (iterator.hasNext()) {
+                    HashEntry e = iterator.next();
+                    // 碰到第一个未过期的，则退出
+                    if (!isExpired(e, now)) {
                         break;
                     }
 
@@ -391,18 +393,24 @@ final class Segment extends ReentrantLock implements Serializable {
 
                     AbsReference ref = e.getQueueEntry();
                     if (ref.isAllPersist()) {
-                        logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), ref});
-                        removeEntry(e, e.getHash());
+                        toRemoved.add(e);
                     } else {
                         // 延长有效期
                         recordAccess(e);
 
+                        // todo 这里会不会重复发送？？？
+                        // todo 如果重复发送会不会出现那里移除，这里又发了一遍？
                         // 发送当前数据到persistQueue
                         Map<String, PersistValue> persistMap = e.getQueueEntry().getPersistMap();
                         if (!persistMap.isEmpty()) {
                             this.persistQueue.sendToPersistQueue(persistMap.values());
                         }
                     }
+                }
+                // 注意：不要在iter的时候移除，这样HashEntry会被置为NullEntry，导致迭代异常
+                for (HashEntry e : toRemoved) {
+                    logger.warn("缓存[{}-{}]过期", new Object[]{e.getKey(), e.getQueueEntry()});
+                    removeEntry(e, e.getHash());
                 }
             } finally {
                 unlock();

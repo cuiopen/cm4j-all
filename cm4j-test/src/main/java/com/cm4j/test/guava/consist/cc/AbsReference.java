@@ -15,7 +15,7 @@ import java.util.Set;
  */
 public abstract class AbsReference {
 
-    private final Map<String, PersistValue> persistMap = Maps.newHashMap();
+    private final Map<String, PersistValue> persistMap = Maps.newConcurrentMap();
 
     /**
      * 此对象所依附的key
@@ -48,7 +48,7 @@ public abstract class AbsReference {
             @Override
             public Object doInSegmentUnderLock(Segment segment, HashEntry entry, AbsReference ref) {
                 Preconditions.checkArgument(ref != null && ref == AbsReference.this,
-                        "ref为空或与缓存中不一致[可能缓存过期或重新加载]:" + (ref == null ? "" : ref.getAttachedKey()));
+                        "ref为空或与缓存中不一致[可能缓存过期或重新加载]:" + (ref == null ? "ref NULL" : ref.getAttachedKey()));
                 _update(e);
                 changeDbState(e, DBState.U);
                 return null;
